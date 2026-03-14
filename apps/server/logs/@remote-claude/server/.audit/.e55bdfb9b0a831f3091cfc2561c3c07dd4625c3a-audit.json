@@ -1,0 +1,15 @@
+{
+  "keep": {
+    "days": true,
+    "amount": 7
+  },
+  "auditLog": "/Users/zhangyang/spark_ai_project/apark_coding/apps/server/logs/@remote-claude/server/.audit/.e55bdfb9b0a831f3091cfc2561c3c07dd4625c3a-audit.json",
+  "files": [
+    {
+      "date": 1773480014399,
+      "name": "/Users/zhangyang/spark_ai_project/apark_coding/apps/server/logs/@remote-claude/server/common-error.log.2026-03-14",
+      "hash": "c6dfec32be5c5845c9797bd61b343664"
+    }
+  ],
+  "hashType": "md5"
+}

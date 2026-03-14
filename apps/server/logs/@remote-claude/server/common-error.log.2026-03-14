@@ -1,0 +1,50 @@
+2026-03-14 17:23:23.318 ERROR 77615 TypeError: socket.emit is not a function
+    at RelayController.sendError (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:240:12)
+    at RelayController.verifyRole (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:218:12)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:112:23)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:148:89
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 17:23:50.620 ERROR 82104 TypeError: socket.emit is not a function
+    at RelayController.sendError (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:240:12)
+    at RelayController.verifyRole (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:218:12)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:112:23)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:148:89
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 17:35:02.757 ERROR 7988 TypeError: socket.emit is not a function
+    at RelayController.sendError (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:240:12)
+    at RelayController.verifyRole (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:218:12)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:112:23)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:148:89
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 17:52:41.536 ERROR 35184 TypeError: socket.emit is not a function
+    at RelayController.sendError (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:240:12)
+    at RelayController.verifyRole (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:218:12)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:112:23)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:148:89
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 18:04:49.955 ERROR 50706 TypeError: socket.emit is not a function
+    at RelayController.sendError (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:240:12)
+    at RelayController.verifyRole (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:218:12)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/apark_coding/apps/server/src/socket/relay.controller.ts:112:23)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:148:89
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)

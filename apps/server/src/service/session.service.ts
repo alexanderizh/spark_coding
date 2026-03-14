@@ -86,4 +86,42 @@ export class SessionService {
       .execute();
     return result.affected ?? 0;
   }
+
+  /** Admin: list sessions with pagination and optional state filter */
+  async listSessions(options: {
+    page?: number;
+    limit?: number;
+    state?: SessionState;
+  }): Promise<{ sessions: Session[]; total: number }> {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.min(100, Math.max(1, options.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const qb = this.sessionRepo
+      .createQueryBuilder('s')
+      .orderBy('s.last_activity_at', 'DESC');
+
+    if (options.state) {
+      qb.andWhere('s.state = :state', { state: options.state });
+    }
+
+    const [sessions, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    return { sessions, total };
+  }
+
+  /** Admin: get session counts by state */
+  async getStats(): Promise<Record<string, number>> {
+    const rows = await this.sessionRepo
+      .createQueryBuilder('s')
+      .select('s.state', 'state')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('s.state')
+      .getRawMany<{ state: string; count: string }>();
+
+    const stats: Record<string, number> = {};
+    for (const r of rows) {
+      stats[r.state] = parseInt(r.count, 10);
+    }
+    return stats;
+  }
 }

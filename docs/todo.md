@@ -6,7 +6,7 @@
 - [ ] 确认 Node.js 18+ 已安装
 - [ ] 确认 Yarn 已安装（`yarn --version`）
 - [ ] 确认 Claude CLI 已安装并配置 API Key（`claude --version`）
-- [ ] Windows 用户：安装 Visual Studio Build Tools（node-pty 编译需要）
+- [ ] macOS 用户：安装 Xcode Command Line Tools（node-pty 编译需要，执行 `xcode-select --install`）
 
 ### 安装与构建
 - [ ] 执行 `yarn install`（根目录）

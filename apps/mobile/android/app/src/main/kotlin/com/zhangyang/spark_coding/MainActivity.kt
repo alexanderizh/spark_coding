@@ -1,4 +1,4 @@
-package com.remoteclaude.mobile
+package com.zhangyang.spark_coding
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn workspace:*)",
+      "Bash(node:*)",
+      "Bash(python3:*)",
+      "Bash(yarn add:*)"
+    ]
+  }
+}

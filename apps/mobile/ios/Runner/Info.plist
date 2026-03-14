@@ -4,7 +4,7 @@
 <dict>
 	<!-- App display name -->
 	<key>CFBundleDisplayName</key>
-	<string>Remote Claude</string>
+	<string>Spark Coding</string>
 
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -16,7 +16,7 @@
 	<string>6.0</string>
 
 	<key>CFBundleName</key>
-	<string>remote_claude_mobile</string>
+	<string>Spark Coding</string>
 
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
@@ -36,7 +36,7 @@
 	     permission dialog. Make it descriptive and user-friendly.
 	     --------------------------------------------------------------- -->
 	<key>NSCameraUsageDescription</key>
-	<string>Remote Claude needs camera access to scan the QR code displayed in your host terminal and pair with the relay server.</string>
+	<string>Spark Coding needs camera access to scan the QR code displayed in your host terminal and pair with the relay server.</string>
 
 	<!-- ---------------------------------------------------------------
 	     App Transport Security — allows insecure HTTP/WS connections
@@ -70,7 +70,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.remoteclaude.mobile</string>
+			<string>com.zhangyang.spark_coding</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>remoteclaude</string>
@@ -81,7 +81,7 @@
 	<!-- Local network usage description (iOS 14+) — required when
 	     connecting to devices on the local network. -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Remote Claude connects to your local relay server to control Claude CLI on your host machine.</string>
+	<string>Spark Coding connects to your local relay server to control Claude CLI on your host machine.</string>
 
 	<!-- Bonjour services used for local network discovery (if applicable) -->
 	<key>NSBonjourServices</key>

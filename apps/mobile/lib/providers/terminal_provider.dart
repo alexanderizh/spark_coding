@@ -53,6 +53,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
           TerminalState(
             terminal: Terminal(
               maxLines: 10000,
+              onOutput: (data) => socketService.sendInput(data),
             ),
           ),
         ) {
@@ -129,7 +130,10 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   void reset() {
     _pendingChunks.clear();
     state = TerminalState(
-      terminal: Terminal(maxLines: 10000),
+      terminal: Terminal(
+        maxLines: 10000,
+        onOutput: (data) => _socketService.sendInput(data),
+      ),
       lastSeq: -1,
       fontSize: state.fontSize,
     );

@@ -1,0 +1,35 @@
+---
+description: MidwayJS 服务端启动与配置规范
+globs: apps/server/**/*
+alwaysApply: false
+---
+
+# MidwayJS 服务端规范
+
+## 启动入口
+
+- 使用 `@midwayjs/bootstrap` 的 `Bootstrap.run()`，不要从 `@midwayjs/core` 导入 Bootstrap（core 不导出 Bootstrap）
+- 需同时依赖 `@midwayjs/bootstrap` 和 `@midwayjs/logger`
+
+## 配置要求
+
+- `config.keys` 为必填项（Koa cookie 签名），可在 `config.default.ts` 中配置：
+  ```ts
+  keys: process.env.APP_KEYS?.split(',') ?? ['remote-claude-default-key']
+  ```
+
+## Socket.IO 控制器
+
+- 断开连接装饰器为 `OnWSDisConnection`，不是 `OnWSDisconnect`
+- `Application` 类型即 Socket.IO Server，使用 `this.app.to(room).emit()`，不要用 `this.app.io.to()`
+
+## TypeORM + better-sqlite3
+
+- 实体列需显式指定 `type`，避免 "Data type Object not supported" 错误
+- 字符串列：`type: 'varchar'`
+- 日期列：`type: 'datetime'`
+
+## TypeScript 严格模式
+
+- 依赖注入属性（@Inject、@App 等）在 `strictPropertyInitialization` 下需初始化
+- 可在 `apps/server/tsconfig.json` 中设置 `strictPropertyInitialization: false` 以兼容 Midway 注入

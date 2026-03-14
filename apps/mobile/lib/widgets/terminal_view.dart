@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 
-import '../providers/connection_provider.dart';
 import '../providers/terminal_provider.dart';
 
 /// Callback fired when the terminal dimensions change due to a layout resize.
@@ -81,7 +80,7 @@ class _TerminalViewWidgetState extends ConsumerState<TerminalViewWidget> {
 
           return TerminalView(
             terminal,
-            style: TerminalStyle(
+            textStyle: TerminalStyle(
               fontSize: fontSize,
               fontFamily: 'monospace',
             ),
@@ -89,11 +88,6 @@ class _TerminalViewWidgetState extends ConsumerState<TerminalViewWidget> {
             autofocus: true,
             backgroundOpacity: 1.0,
             padding: const EdgeInsets.all(4),
-            onOutput: (data) {
-              // Forward keyboard input typed directly in the terminal view
-              // to the host agent via the socket service.
-              ref.read(socketServiceProvider).sendInput(data);
-            },
           );
         },
       ),

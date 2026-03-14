@@ -1,4 +1,4 @@
-import { WSController, OnWSConnection, OnWSDisconnect, OnWSMessage, Inject, App } from '@midwayjs/decorator';
+import { WSController, OnWSConnection, OnWSDisConnection, OnWSMessage, Inject, App } from '@midwayjs/decorator';
 import { Application } from '@midwayjs/socketio';
 import { Socket } from 'socket.io';
 import { SessionService } from '../service/session.service';
@@ -80,7 +80,7 @@ export class RelayController {
 
   // ── Disconnect ──────────────────────────────────────────────────────────────
 
-  @OnWSDisconnect()
+  @OnWSDisConnection()
   async onDisconnect(socket: Socket) {
     const meta = socketMeta.get(socket.id);
     if (!meta) return;
@@ -178,7 +178,7 @@ export class RelayController {
       pairedAt: (session.pairedAt ?? now).getTime(),
     };
     // Notify both agent and mobile
-    this.app.io.to(meta.sessionId).emit(Events.SESSION_PAIR, pairPayload);
+    this.app.to(meta.sessionId).emit(Events.SESSION_PAIR, pairPayload);
 
     const updated = await this.sessionService.findById(meta.sessionId);
     if (updated) this.broadcastState(meta.sessionId, updated);
@@ -252,6 +252,6 @@ export class RelayController {
       mobileConnected: !!session.mobileSocketId,
       timestamp: Date.now(),
     };
-    this.app.io.to(sessionId).emit(Events.SESSION_STATE, payload);
+    this.app.to(sessionId).emit(Events.SESSION_STATE, payload);
   }
 }

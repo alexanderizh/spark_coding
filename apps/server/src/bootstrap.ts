@@ -1,7 +1,7 @@
-import { Bootstrap } from '@midwayjs/core';
-import { ContainerLifeCycle } from './configuration';
+import 'dotenv/config';
+import { Bootstrap } from '@midwayjs/bootstrap';
 
-Bootstrap.run(ContainerLifeCycle).catch(err => {
+Bootstrap.run().catch((err: unknown) => {
   console.error('[bootstrap] fatal:', err);
   process.exit(1);
 });

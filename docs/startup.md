@@ -10,14 +10,13 @@
 | Flutter | 3.19.x | 手机端 |
 | Claude CLI | 最新版 | 主机上需已安装并配置 API Key |
 
-### Windows 额外要求
+### macOS 额外要求
 
-node-pty 需要原生编译，Windows 上需要：
+node-pty 需要原生编译，macOS 上需要安装 Xcode Command Line Tools：
 
 ```bash
-# 安装 Visual Studio Build Tools（选 "Desktop development with C++"）
-# 或使用 npm 全局安装
-npm install -g windows-build-tools
+# 安装 Xcode Command Line Tools（首次会弹出安装对话框）
+xcode-select --install
 ```
 
 ---
@@ -25,7 +24,7 @@ npm install -g windows-build-tools
 ## 第一步：安装依赖
 
 ```bash
-cd G:\good_coding\remote-claude
+cd ~/apark_coding
 
 # 安装所有 Node.js 依赖（server + terminal + shared）
 yarn install
@@ -109,7 +108,7 @@ yarn start:terminal
 ## 第四步：运行手机 App
 
 ```bash
-cd G:\good_coding\remote-claude\apps\mobile
+cd ~/apark_coding/apps/mobile
 
 # 首次运行先获取依赖
 flutter pub get
@@ -130,7 +129,7 @@ flutter build ios --release
 **首次运行注意**：Flutter 会提示需要补全项目脚手架文件（如 Xcode project、GeneratedPluginRegistrant 等），执行以下命令补全但不覆盖已有文件：
 
 ```bash
-cd G:\good_coding\remote-claude\apps\mobile
+cd ~/apark_coding/apps/mobile
 flutter create . --project-name remote_claude_mobile
 ```
 
@@ -170,7 +169,7 @@ wscat -c "ws://localhost:7001" --header "Authorization: Bearer TOKEN"
 
 ```bash
 # 使用 sqlite3 命令行（或 DB Browser for SQLite 图形工具）
-sqlite3 G:\good_coding\remote-claude\apps\server\data\remote-claude.db
+sqlite3 ~/apark_coding/apps/server/data/remote-claude.db
 .tables
 SELECT id, token, state, paired_at FROM sessions;
 ```
@@ -185,11 +184,10 @@ Flutter 运行期间在终端按 `r` 热重载，`R` 热重启，`q` 退出。
 
 **Q: `yarn dev:terminal` 提示 node-pty 编译失败**
 
-Windows 需要 Build Tools：
+macOS 需要 Xcode Command Line Tools：
 ```bash
-npm install -g node-gyp
-npm install -g windows-build-tools
-# 然后重新 yarn install
+xcode-select --install
+# 安装完成后重新 yarn install
 ```
 
 **Q: 服务端启动报 `EADDRINUSE: address already in use :::7001`**

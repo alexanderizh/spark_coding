@@ -149,7 +149,7 @@ class RemoteClaudeApp extends ConsumerWidget {
         hintStyle: const TextStyle(color: Color(0xFF555555), fontFamily: 'monospace'),
         prefixStyle: const TextStyle(color: onSurfaceColor, fontFamily: 'monospace'),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surfaceColor,
         elevation: 0,
         shape: RoundedRectangleBorder(

@@ -6,7 +6,8 @@
   "workspaces": [
     "packages/*",
     "apps/server",
-    "apps/terminal"
+    "apps/terminal",
+    "apps/admin"
   ],
   "scripts": {
     "build:shared": "yarn workspace @remote-claude/shared build",
@@ -14,10 +15,15 @@
     "build:terminal": "yarn workspace @remote-claude/terminal build",
     "dev:server": "yarn workspace @remote-claude/server dev",
     "dev:terminal": "yarn workspace @remote-claude/terminal dev",
+    "dev:admin": "yarn workspace admin dev",
+    "build:admin": "yarn workspace admin build",
     "start:server": "yarn workspace @remote-claude/server start",
     "start:terminal": "yarn workspace @remote-claude/terminal start"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "typeorm": "^0.3.20"
   }
 }
