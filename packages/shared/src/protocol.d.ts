@@ -8,15 +8,22 @@ export declare const Events: {
     readonly TERMINAL_INPUT: "terminal:input";
     readonly TERMINAL_RESIZE: "terminal:resize";
     readonly SESSION_PING: "session:ping";
+    readonly RUNTIME_ENSURE: "runtime:ensure";
+    readonly RUNTIME_STATUS: "runtime:status";
     readonly SESSION_STATE: "session:state";
     readonly SESSION_PAIR: "session:pair";
     readonly SESSION_ERROR: "session:error";
 };
 export type EventName = typeof Events[keyof typeof Events];
+export declare const CliTypes: {
+    readonly CLAUDE: "claude";
+};
+export type CliType = typeof CliTypes[keyof typeof CliTypes];
 export interface AgentRegisterPayload {
     sessionToken: string;
     agentVersion: string;
     platform: string;
+    hostname: string;
 }
 export interface MobileJoinPayload {
     sessionToken: string;
@@ -42,6 +49,7 @@ export interface SessionStatePayload {
     state: SessionState;
     agentConnected: boolean;
     mobileConnected: boolean;
+    agentHostname?: string | null;
     timestamp: number;
 }
 export interface SessionPairPayload {
@@ -61,6 +69,18 @@ export interface SessionErrorPayload {
 }
 export interface SessionPingPayload {
     sessionId: string;
+    timestamp: number;
+}
+export interface RuntimeEnsurePayload {
+    sessionId: string;
+    cliType: CliType;
+}
+export interface RuntimeStatusPayload {
+    sessionId: string;
+    cliType: CliType;
+    ready: boolean;
+    started: boolean;
+    message?: string;
     timestamp: number;
 }
 export declare const QR_SCHEME = "sparkcoder";

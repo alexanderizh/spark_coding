@@ -1,4 +1,10 @@
-# 启动文档
+# 启动文档（CLI 开发模式）
+
+> **普通用户请看 [desktop.md](./desktop.md)**，只需下载安装包即可，无需阅读本文档。
+>
+> 本文档面向需要本地开发调试的开发者，介绍如何从源码启动全部服务。
+
+---
 
 ## 环境要求
 
@@ -237,3 +243,23 @@ flutter run
 **Q: 如何在局域网内使用（手机和电脑在同一 WiFi）**
 
 将服务端部署在电脑上，在 `apps/terminal/.env`（开发）或 `.prod.env`（生产）中设置 `REMOTE_CLAUDE_SERVER=http://192.168.1.100:7001`（电脑的局域网 IP）。同时修改 `apps/server/.env` 确保服务端监听 `0.0.0.0`（MidwayJS 默认即是）。
+
+---
+
+## 桌面端（Desktop）开发
+
+如需开发 Electron 桌面端，无需启动 terminal CLI，直接：
+
+```bash
+# 开发模式（热更新，同时启动 Electron + Vite）
+yarn dev:desktop
+
+# 构建
+yarn build:desktop
+
+# 打包安装包
+yarn dist:desktop:mac   # macOS .dmg
+yarn dist:desktop:win   # Windows .exe
+```
+
+详见 [desktop.md](./desktop.md)。

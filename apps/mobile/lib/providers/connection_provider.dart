@@ -94,7 +94,7 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
     _statusSub = _socketService.connectionStatus.listen((socketStatus) {
       AppLogger.info(
         'Connection',
-        'Socket 状态变更: $socketStatus, serverUrl: ${state.serverUrl}',
+        'Socket 状态变更: $socketStatus',
       );
       switch (socketStatus) {
         case SocketConnectionStatus.connected:
@@ -131,7 +131,7 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
   }) async {
     AppLogger.info(
       'Connection',
-      'connect 调用 — serverUrl: $serverUrl, sessionId: $sessionId',
+      'connect 调用 — sessionId: $sessionId',
     );
 
     if (state.status == ConnectionStatus.connecting ||

@@ -15,6 +15,8 @@ import {
   SessionStatePayload,
   SessionPairPayload,
   SessionErrorPayload,
+  RuntimeEnsurePayload,
+  RuntimeStatusPayload,
 } from '@spark_coder/shared';
 
 const MAX_PAYLOAD_BYTES = 64 * 1024; // 64 KB
@@ -25,6 +27,7 @@ interface SocketMeta {
   sessionId: string;
   token: string;
   role: 'agent' | 'mobile';
+  agentHostname: string | null;
   eventCount: number;
   windowStart: number;
 }
@@ -74,6 +77,7 @@ export class RelayController {
       sessionId: session.id,
       token,
       role,
+      agentHostname: null,
       eventCount: 0,
       windowStart: Date.now(),
     });
@@ -90,23 +94,29 @@ export class RelayController {
     if (!meta) return;
     socketMeta.delete(socket.id);
 
-    const session = await this.sessionService.findById(meta.sessionId);
-    if (!session || this.sessionService.isExpired(session)) return;
+    try {
+      const session = await this.sessionService.findById(meta.sessionId);
+      if (!session || this.sessionService.isExpired(session)) return;
 
-    if (meta.role === 'agent') {
-      await this.sessionService.updateState(meta.sessionId, {
-        state: SessionState.MOBILE_DISCONNECTED,
-        agentSocketId: null,
-      });
-    } else {
-      await this.sessionService.updateState(meta.sessionId, {
-        state: session.agentSocketId ? SessionState.AGENT_DISCONNECTED : SessionState.WAITING_FOR_AGENT,
-        mobileSocketId: null,
-      });
+      if (meta.role === 'agent') {
+        await this.sessionService.updateState(meta.sessionId, {
+          state: SessionState.MOBILE_DISCONNECTED,
+          agentSocketId: null,
+        });
+      } else {
+        await this.sessionService.updateState(meta.sessionId, {
+          state: session.agentSocketId ? SessionState.AGENT_DISCONNECTED : SessionState.WAITING_FOR_AGENT,
+          mobileSocketId: null,
+        });
+      }
+
+      const updated = await this.sessionService.findById(meta.sessionId);
+      if (updated) this.broadcastState(meta.sessionId, updated);
+    } catch (err: unknown) {
+      // 应用关闭时 DataSource 可能已销毁，忽略数据库相关错误
+      const e = err as { code?: string };
+      if (e?.code !== 'MIDWAY_10001') throw err;
     }
-
-    const updated = await this.sessionService.findById(meta.sessionId);
-    if (updated) this.broadcastState(meta.sessionId, updated);
   }
 
   // ── Agent events ────────────────────────────────────────────────────────────
@@ -125,10 +135,15 @@ export class RelayController {
       return;
     }
 
+    const hostname =
+      typeof payload.hostname === 'string' ? payload.hostname.trim() : '';
+    meta.agentHostname = hostname || null;
+
     await this.sessionService.updateState(meta.sessionId, {
       state: SessionState.WAITING_FOR_MOBILE,
       agentSocketId: socket.id,
       agentPlatform: payload.platform,
+      agentHostname: meta.agentHostname,
     });
 
     const updated = await this.sessionService.findById(meta.sessionId);
@@ -152,6 +167,13 @@ export class RelayController {
     const meta = this.verifyRole('agent');
     if (!meta) return;
     this.ctx.to(meta.sessionId).emit(Events.CLAUDE_PROMPT, payload);
+  }
+
+  @OnWSMessage(Events.RUNTIME_STATUS)
+  async onRuntimeStatus(payload: RuntimeStatusPayload) {
+    const meta = this.verifyRole('agent');
+    if (!meta) return;
+    this.ctx.to(meta.sessionId).emit(Events.RUNTIME_STATUS, payload);
   }
 
   // ── Mobile events ───────────────────────────────────────────────────────────
@@ -206,6 +228,18 @@ export class RelayController {
     this.ctx.to(meta.sessionId).emit(Events.TERMINAL_RESIZE, payload);
   }
 
+  @OnWSMessage(Events.RUNTIME_ENSURE)
+  async onRuntimeEnsure(payload: RuntimeEnsurePayload) {
+    const meta = this.verifyRole('mobile');
+    if (!meta) return;
+    const session = await this.sessionService.findById(meta.sessionId);
+    if (!session || !session.agentSocketId) {
+      this.sendError(SessionErrorCode.SESSION_NOT_FOUND, 'Agent is not connected');
+      return;
+    }
+    this.ctx.to(meta.sessionId).emit(Events.RUNTIME_ENSURE, payload);
+  }
+
   // ── Keepalive ───────────────────────────────────────────────────────────────
 
   @OnWSMessage(Events.SESSION_PING)
@@ -250,14 +284,25 @@ export class RelayController {
     state: SessionState;
     agentSocketId: string | null;
     mobileSocketId: string | null;
+    agentHostname?: string | null;
   }) {
     const payload: SessionStatePayload = {
       sessionId,
       state: session.state,
       agentConnected: !!session.agentSocketId,
       mobileConnected: !!session.mobileSocketId,
+      agentHostname: session.agentHostname ?? this.findAgentHostname(sessionId),
       timestamp: Date.now(),
     };
     this.app.to(sessionId).emit(Events.SESSION_STATE, payload);
+  }
+
+  private findAgentHostname(sessionId: string): string | null {
+    for (const meta of socketMeta.values()) {
+      if (meta.role === 'agent' && meta.sessionId == sessionId) {
+        return meta.agentHostname;
+      }
+    }
+    return null;
   }
 }

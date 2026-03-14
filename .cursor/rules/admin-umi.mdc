@@ -20,4 +20,7 @@ alwaysApply: false
 ## 配置注意事项
 
 - **Umi Max 项目**：必须使用 `max` 命令（如 `max setup`、`max dev`、`max build`），不能使用 `umi`，否则会报 `Invalid config keys: devServer, antd` 错误
+- **依赖冲突**：使用 `@umijs/max` 时，不要在 package.json 中单独添加 `umi` 依赖，`@umijs/max` 已包含 umi，否则会报 `You are using @umijs/max, please remove umi from your dependencies` 错误
+- **布局与路由**：使用约定式布局 `src/layouts/index.tsx` 作为全局布局（含 Header、Menu、Outlet），路由采用扁平结构，各页面通过 `wrappers` 做权限校验；不要在 routes 中重复指定 `component: '@/layouts/index'`，否则会导致布局冲突
 - **端口配置**：Umi 4 不支持 `devServer.port`，需通过 `cross-env PORT=5174` 在 dev 脚本中设置
+- **prepare 阶段 umi 解析**：若出现 `Can't resolve '.umi/exports'` 的 esbuildAliasPlugin 报错，需在 .umirc.ts 中显式配置 `alias: { umi: path.join(__dirname, 'src/.umi/exports.ts') }`，因 enhanced-resolve 对无扩展名路径解析可能失败

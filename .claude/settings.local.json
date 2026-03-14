@@ -5,7 +5,12 @@
       "Bash(node:*)",
       "Bash(python3:*)",
       "Bash(yarn add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(cd:*)",
+      "Bash(npx electron-vite:*)",
+      "Bash(timeout:*)",
+      "Bash(pkill:*)"
     ]
   }
 }

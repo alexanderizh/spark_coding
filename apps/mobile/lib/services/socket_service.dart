@@ -15,6 +15,7 @@ class SocketService {
   io.Socket? _socket;
   Timer? _pingTimer;
   String? _currentSessionId;
+  String? _pendingRuntimeCliType;
 
   // ---------------------------------------------------------------------------
   // Stream controllers for typed inbound events
@@ -27,6 +28,8 @@ class SocketService {
       StreamController<SessionStateEvent>.broadcast();
   final _sessionPairsController = StreamController<SessionPair>.broadcast();
   final _sessionErrorsController = StreamController<SessionError>.broadcast();
+  final _runtimeStatusController =
+      StreamController<RuntimeStatusEvent>.broadcast();
   final _connectionStatusController =
       StreamController<SocketConnectionStatus>.broadcast();
 
@@ -50,6 +53,9 @@ class SocketService {
   /// Error events from the relay server.
   Stream<SessionError> get sessionErrors => _sessionErrorsController.stream;
 
+  Stream<RuntimeStatusEvent> get runtimeStatus =>
+      _runtimeStatusController.stream;
+
   /// Raw socket connection status (connected / disconnected / error).
   Stream<SocketConnectionStatus> get connectionStatus =>
       _connectionStatusController.stream;
@@ -70,10 +76,7 @@ class SocketService {
     required String sessionId,
     required String deviceId,
   }) async {
-    AppLogger.info(
-      'SocketService',
-      'connect — serverUrl: $serverUrl, sessionId: $sessionId',
-    );
+    AppLogger.info('SocketService', 'connect — sessionId: $sessionId');
 
     // Clean up any existing connection before establishing a new one.
     await disconnect();
@@ -124,12 +127,22 @@ class SocketService {
     });
   }
 
+  void sendRuntimeEnsure(String cliType) {
+    _pendingRuntimeCliType = cliType;
+    if (!isConnected || _currentSessionId == null) return;
+    _socket!.emit('runtime:ensure', {
+      'sessionId': _currentSessionId,
+      'cliType': cliType,
+    });
+  }
+
   /// Gracefully closes the socket and cleans up all resources.
   Future<void> disconnect() async {
     _stopPing();
     _socket?.dispose();
     _socket = null;
     _currentSessionId = null;
+    _pendingRuntimeCliType = null;
   }
 
   /// Releases all stream controllers. Call this only when the service is being
@@ -141,6 +154,7 @@ class SocketService {
     _sessionStatesController.close();
     _sessionPairsController.close();
     _sessionErrorsController.close();
+    _runtimeStatusController.close();
     _connectionStatusController.close();
   }
 
@@ -163,6 +177,13 @@ class SocketService {
       socket.emit('mobile:join', {'sessionToken': token, 'deviceId': deviceId});
       AppLogger.info('SocketService', '已发送 mobile:join');
 
+      if (_pendingRuntimeCliType != null) {
+        socket.emit('runtime:ensure', {
+          'sessionId': sessionId,
+          'cliType': _pendingRuntimeCliType,
+        });
+      }
+
       _startPing(sessionId);
     });
 
@@ -175,7 +196,7 @@ class SocketService {
     socket.onConnectError((error) {
       AppLogger.error(
         'SocketService',
-        'onConnectError: 连接失败（请检查 serverUrl、网络、服务器是否启动）',
+        'onConnectError: 连接失败（请检查网络与服务状态）',
         error,
       );
       _connectionStatusController.add(SocketConnectionStatus.error);
@@ -271,6 +292,17 @@ class SocketService {
         AppLogger.error('SocketService', '解析 session:error 失败', e);
       }
     });
+
+    socket.on('runtime:status', (data) {
+      try {
+        final map = _toMap(data);
+        if (map != null) {
+          _runtimeStatusController.add(RuntimeStatusEvent.fromJson(map));
+        }
+      } catch (e) {
+        AppLogger.error('SocketService', '解析 runtime:status 失败', e);
+      }
+    });
   }
 
   /// Sends a keepalive ping to the server every 30 seconds.
@@ -321,6 +353,7 @@ class SessionStateEvent {
     required this.state,
     required this.agentConnected,
     required this.mobileConnected,
+    required this.agentHostname,
     required this.timestamp,
   });
 
@@ -328,6 +361,7 @@ class SessionStateEvent {
   final SessionState state;
   final bool agentConnected;
   final bool mobileConnected;
+  final String? agentHostname;
   final int timestamp;
 
   factory SessionStateEvent.fromJson(Map<String, dynamic> json) =>
@@ -336,6 +370,37 @@ class SessionStateEvent {
         state: SessionState.fromString(json['state'] as String? ?? 'unknown'),
         agentConnected: json['agentConnected'] as bool? ?? false,
         mobileConnected: json['mobileConnected'] as bool? ?? false,
+        agentHostname: json['agentHostname'] as String?,
         timestamp: json['timestamp'] as int,
       );
+}
+
+class RuntimeStatusEvent {
+  const RuntimeStatusEvent({
+    required this.sessionId,
+    required this.cliType,
+    required this.ready,
+    required this.started,
+    required this.message,
+    required this.timestamp,
+  });
+
+  final String sessionId;
+  final String cliType;
+  final bool ready;
+  final bool started;
+  final String? message;
+  final int timestamp;
+
+  factory RuntimeStatusEvent.fromJson(Map<String, dynamic> json) {
+    return RuntimeStatusEvent(
+      sessionId: json['sessionId'] as String,
+      cliType: json['cliType'] as String? ?? 'claude',
+      ready: json['ready'] as bool? ?? false,
+      started: json['started'] as bool? ?? false,
+      message: json['message'] as String?,
+      timestamp:
+          json['timestamp'] as int? ?? DateTime.now().millisecondsSinceEpoch,
+    );
+  }
 }

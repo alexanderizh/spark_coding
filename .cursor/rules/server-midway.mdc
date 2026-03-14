@@ -24,12 +24,17 @@ alwaysApply: false
 - `Application` 类型即 Socket.IO Server，使用 `this.app.to(room).emit()`，不要用 `this.app.io.to()`
 - 多框架（如 Koa + SocketIO）时，需用 `@App('socketIO')` 注入 Socket.IO 实例，否则 `@App()` 会注入主框架（Koa）的 Application
 - `@OnWSMessage` 只接收客户端发送的 payload，不接收 socket 参数；需通过 `@Inject('socket') ctx: Context` 获取当前连接，`Context` 即 socket 实例
+- `runtime:ensure`（mobile→agent）和 `runtime:status`（agent→mobile）需要做角色校验并按 `sessionId` 房间中继，agent 不在线时返回 `session:error`
 
 ## TypeORM + better-sqlite3
 
 - 实体列需显式指定 `type`，避免 "Data type Object not supported" 错误
 - 字符串列：`type: 'varchar'`
 - 日期列：`type: 'datetime'`
+
+## 会话状态接口
+
+- `GET /api/session/:token` 若用于 mobile 连接列表展示，需返回 `agentHostname` 字段，卡片主标题优先使用该值。
 
 ## TypeScript 严格模式
 

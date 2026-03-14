@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../app/router.dart';
 import '../providers/connection_provider.dart';
+import '../providers/link_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
 import '../utils/app_logger.dart';
@@ -91,35 +92,39 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       final (token, serverUrl, sessionId) = parsed;
       AppLogger.info(
         'Scanner',
-        '解析成功 — server: $serverUrl, sessionId: $sessionId, token长度: ${token.length}',
+        '解析成功 — sessionId: $sessionId, token长度: ${token.length}',
       );
 
-      // Persist session credentials.
-      final sessionService = ref.read(sessionServiceProvider);
-      await sessionService.save(
-        serverUrl: serverUrl,
-        token: token,
-        sessionId: sessionId,
-      );
+      final savedLink = await ref
+          .read(linkNotifierProvider.notifier)
+          .saveFromScan(
+            serverUrl: serverUrl,
+            token: token,
+            sessionId: sessionId,
+          );
       AppLogger.info('Scanner', '会话已保存');
 
       // Initialise session model.
       ref
           .read(sessionNotifierProvider.notifier)
           .initSession(
-            sessionId: sessionId,
-            token: token,
-            serverUrl: serverUrl,
+            sessionId: savedLink.sessionId,
+            token: savedLink.token,
+            serverUrl: savedLink.serverUrl,
           );
 
       // Reset terminal for the fresh session.
       ref.read(terminalNotifierProvider.notifier).reset();
 
       // Connect to relay server.
-      AppLogger.info('Scanner', '正在连接中继服务器: $serverUrl');
+      AppLogger.info('Scanner', '正在连接中继服务');
       await ref
           .read(connectionNotifierProvider.notifier)
-          .connect(serverUrl: serverUrl, token: token, sessionId: sessionId);
+          .connect(
+            serverUrl: savedLink.serverUrl,
+            token: savedLink.token,
+            sessionId: savedLink.sessionId,
+          );
 
       if (!mounted) return;
       AppLogger.info('Scanner', '连接成功，跳转到终端页');

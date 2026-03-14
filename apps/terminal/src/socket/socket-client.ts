@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import os from 'os';
 import {
   Events,
   SessionState,
@@ -12,6 +13,9 @@ import {
   SessionStatePayload,
   SessionErrorPayload,
   ClaudePromptType,
+  RuntimeEnsurePayload,
+  RuntimeStatusPayload,
+  CliTypes,
 } from '@spark_coder/shared';
 import { AgentConfig } from '../utils/config';
 import { PtyManager } from '../pty/pty-manager';
@@ -84,6 +88,7 @@ export class AgentSocketClient {
         sessionToken: opts.token,
         agentVersion: config.agentVersion,
         platform: process.platform,
+        hostname: os.hostname(),
       };
       this.socket.emit(Events.AGENT_REGISTER, payload);
       console.log('[socket] Connected to server, waiting for mobile…');
@@ -136,6 +141,40 @@ export class AgentSocketClient {
       this.pty.resize(payload.cols, payload.rows);
     });
 
+    this.socket.on(Events.RUNTIME_ENSURE, (payload: RuntimeEnsurePayload) => {
+      if (payload.cliType !== CliTypes.CLAUDE) return;
+      if (this.pty.isAlive()) {
+        this.emitRuntimeStatus({
+          sessionId: this.sessionId,
+          cliType: CliTypes.CLAUDE,
+          ready: true,
+          started: false,
+          timestamp: Date.now(),
+        });
+        return;
+      }
+      try {
+        this.pty.spawn(config);
+        this.emitRuntimeStatus({
+          sessionId: this.sessionId,
+          cliType: CliTypes.CLAUDE,
+          ready: true,
+          started: true,
+          timestamp: Date.now(),
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.emitRuntimeStatus({
+          sessionId: this.sessionId,
+          cliType: CliTypes.CLAUDE,
+          ready: false,
+          started: false,
+          message,
+          timestamp: Date.now(),
+        });
+      }
+    });
+
     // ── Errors ─────────────────────────────────────────────────────────────
     this.socket.on(Events.SESSION_ERROR, (payload: SessionErrorPayload) => {
       console.error(`[error] ${payload.code}: ${payload.message}`);
@@ -161,5 +200,10 @@ export class AgentSocketClient {
     this.detector.destroy();
     this.pty.destroy();
     this.socket.disconnect();
+  }
+
+  private emitRuntimeStatus(payload: RuntimeStatusPayload): void {
+    if (!this.socket.connected) return;
+    this.socket.emit(Events.RUNTIME_STATUS, payload);
   }
 }

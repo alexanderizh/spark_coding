@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QR_SCHEME = exports.Events = void 0;
+exports.QR_SCHEME = exports.CliTypes = exports.Events = void 0;
 exports.buildPairUrl = buildPairUrl;
 exports.parsePairUrl = parsePairUrl;
 // ── Event names ─────────────────────────────────────────────────────────────
@@ -15,10 +15,15 @@ exports.Events = {
     TERMINAL_RESIZE: 'terminal:resize',
     // Either → Server
     SESSION_PING: 'session:ping',
+    RUNTIME_ENSURE: 'runtime:ensure',
+    RUNTIME_STATUS: 'runtime:status',
     // Server → Client (both sides)
     SESSION_STATE: 'session:state',
     SESSION_PAIR: 'session:pair',
     SESSION_ERROR: 'session:error',
+};
+exports.CliTypes = {
+    CLAUDE: 'claude',
 };
 // ── QR pairing URL ───────────────────────────────────────────────────────────
 exports.QR_SCHEME = 'sparkcoder';

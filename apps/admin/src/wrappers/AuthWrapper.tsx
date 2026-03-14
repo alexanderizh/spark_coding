@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, useLocation } from 'umi';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
 
-export default function AuthWrapper(props: { children: React.ReactNode }) {
+export default function AuthWrapper() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
 
@@ -9,5 +9,5 @@ export default function AuthWrapper(props: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return <>{props.children}</>;
+  return <Outlet />; // 渲染子路由 (Layout)
 }

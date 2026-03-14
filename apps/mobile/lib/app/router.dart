@@ -55,6 +55,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final connectionState = ref.read(connectionProvider);
       final sessionState = ref.read(sessionProvider);
+      final hasActiveLink = ref.read(sessionServiceProvider).activeLink != null;
       final currentPath = state.uri.path;
 
       // If user is navigating to terminal but there is no active session,
@@ -65,7 +66,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             connectionState == ConnectionStatus.connecting;
         final hasSession = sessionState != null;
 
-        if (!isConnected && !hasSession) {
+        if (!isConnected && !hasSession && !hasActiveLink) {
           return AppRoutes.home;
         }
       }

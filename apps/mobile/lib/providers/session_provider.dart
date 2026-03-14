@@ -24,18 +24,14 @@ class SessionNotifier extends StateNotifier<SessionModel?> {
 
   void _listenToEvents() {
     _stateSub = _socketService.sessionStates.listen(
-      (event) {
-        _onSessionState(event);
-      },
+      _onSessionState,
       onError: (Object e) {
         debugPrint('[SessionNotifier] sessionStates error: $e');
       },
     );
 
     _pairSub = _socketService.sessionPairs.listen(
-      (pair) {
-        _onSessionPair(pair);
-      },
+      _onSessionPair,
       onError: (Object e) {
         debugPrint('[SessionNotifier] sessionPairs error: $e');
       },
@@ -50,6 +46,7 @@ class SessionNotifier extends StateNotifier<SessionModel?> {
         sessionId: event.sessionId,
         token: '',
         serverUrl: '',
+        agentHostname: event.agentHostname,
         state: event.state,
         agentConnected: event.agentConnected,
         mobileConnected: event.mobileConnected,
@@ -59,6 +56,7 @@ class SessionNotifier extends StateNotifier<SessionModel?> {
         state: event.state,
         agentConnected: event.agentConnected,
         mobileConnected: event.mobileConnected,
+        agentHostname: event.agentHostname,
       );
     }
 
@@ -90,7 +88,6 @@ class SessionNotifier extends StateNotifier<SessionModel?> {
       sessionId: sessionId,
       token: token,
       serverUrl: serverUrl,
-      state: SessionState.unknown,
     );
   }
 

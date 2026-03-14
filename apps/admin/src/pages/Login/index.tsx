@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Form, Input, Button, Card, message } from 'antd';
-import { useNavigate } from 'umi';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getStats } from '@/api/client';
-import styles from './index.less';
+import styles from './index.module.less';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);

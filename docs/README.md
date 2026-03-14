@@ -9,10 +9,9 @@
 spark_coder 是一个三端协同系统，让你在手机上实时查看并控制运行在主机上的 Claude CLI（以及未来更多 CLI 工具）。灵感来源于开源项目 [Happy Coder](https://github.com/slopus/happy)。
 
 ```
-主机终端 (terminal)  ←──WebSocket──→  中继服务器 (server)  ←──WebSocket──→  手机 App (mobile)
-  node-pty                              MidwayJS                              Flutter
-  Claude CLI                            SQLite                                xterm 渲染
-  二维码展示                             会话管理                               QR 扫码
+主机（terminal CLI 或 Desktop App）  ←──WebSocket──→  中继服务器 (server)  ←──WebSocket──→  手机 App (mobile)
+  node-pty · Claude CLI                                MidwayJS · SQLite                     Flutter · xterm
+  二维码展示 / 图形界面                                  会话管理                               QR 扫码
 ```
 
 ---
@@ -37,7 +36,8 @@ spark_coder/
 │   └── shared/              # TypeScript 共享协议类型
 ├── apps/
 │   ├── server/              # MidwayJS 中继服务端
-│   ├── terminal/            # Node.js 主机终端代理
+│   ├── terminal/            # Node.js 主机终端代理（CLI，面向开发者）
+│   ├── desktop/             # Electron 桌面端（安装包，面向普通用户）
 │   └── mobile/              # Flutter 手机端
 ├── package.json             # Yarn Workspaces 根配置
 └── tsconfig.base.json       # 共享 TS 配置
@@ -47,13 +47,15 @@ spark_coder/
 
 ## 快速开始
 
-见 [startup.md](./startup.md)。
+- 开发者（CLI）：见 [startup.md](./startup.md)
+- 普通用户（桌面端）：见 [desktop.md](./desktop.md)
 
 ## 技术栈
 
 | 端 | 技术 |
 |---|---|
 | 服务端 | MidwayJS · Socket.IO · TypeORM · SQLite · Node.js |
-| 主机代理 | Node.js · node-pty · Socket.IO Client · Commander |
+| 主机代理（CLI） | Node.js · node-pty · Socket.IO Client · Commander |
+| 桌面端 | Electron · electron-vite · React · electron-builder |
 | 手机 App | Flutter · Riverpod · xterm · socket_io_client · mobile_scanner |
 | 共享协议 | TypeScript · Yarn Workspaces |

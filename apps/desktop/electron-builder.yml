@@ -1,0 +1,40 @@
+appId: com.sparkcoder.desktop
+productName: Spark Coder
+copyright: Copyright © 2024 Spark Coder
+
+directories:
+  buildResources: resources
+  output: release
+
+files:
+  - out/**/*
+  - node_modules/**/*
+  - package.json
+
+# Rebuild native modules (node-pty) for Electron
+npmRebuild: true
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  # icon: resources/icon.icns   # uncomment after adding icon
+  category: public.app-category.developer-tools
+  hardenedRuntime: false
+  gatekeeperAssess: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  # icon: resources/icon.ico    # uncomment after adding icon
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

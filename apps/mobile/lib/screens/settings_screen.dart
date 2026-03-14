@@ -15,7 +15,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _serverUrlController = TextEditingController();
   late double _fontSize;
   bool _isSaving = false;
 
@@ -28,19 +27,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _initValues() {
-    final session = ref.read(sessionProvider);
-    final sessionService = ref.read(sessionServiceProvider);
     final currentFontSize = ref.read(terminalNotifierProvider).fontSize;
 
-    _serverUrlController.text =
-        session?.serverUrl ?? sessionService.serverUrl ?? '';
     _fontSize = currentFontSize;
-  }
-
-  @override
-  void dispose() {
-    _serverUrlController.dispose();
-    super.dispose();
   }
 
   Future<void> _saveFontSize(double value) async {
@@ -167,8 +156,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
         // Display-only fields for current session
         if (session != null) ...[
-          _readOnlyField(label: '服务器地址', value: session.serverUrl),
-          const SizedBox(height: 8),
           _readOnlyField(label: '会话 ID', value: session.sessionId),
           const SizedBox(height: 8),
           _readOnlyField(

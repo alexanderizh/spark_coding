@@ -51,6 +51,7 @@ export class SessionController {
         state: session.state,
         agentConnected: !!session.agentSocketId,
         mobileConnected: !!session.mobileSocketId,
+        agentHostname: session.agentHostname ?? null,
         pairedAt: session.pairedAt?.getTime() ?? null,
         expiresAt: session.expiresAt.getTime(),
       },

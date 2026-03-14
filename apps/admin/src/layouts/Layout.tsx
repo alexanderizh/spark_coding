@@ -1,20 +1,20 @@
-import { Outlet, useNavigate, useLocation } from 'umi';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout as AntLayout, Menu, Button } from 'antd';
 import { DashboardOutlined, UnorderedListOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useAuth } from '@/contexts/AuthContext';
-import styles from './index.less';
+import styles from './Layout.module.less';
 
 const { Header, Content } = AntLayout;
+
+const menuItems = [
+  { key: '/dashboard', icon: <DashboardOutlined />, label: '概览' },
+  { key: '/sessions', icon: <UnorderedListOutlined />, label: '会话列表' },
+];
 
 export default function Layout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const menuItems = [
-    { key: '/dashboard', icon: <DashboardOutlined />, label: '概览' },
-    { key: '/sessions', icon: <UnorderedListOutlined />, label: '会话列表' },
-  ];
 
   return (
     <AntLayout className={styles.layout}>

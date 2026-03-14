@@ -26,6 +26,7 @@ export class SessionService {
       agentSocketId: null,
       mobileSocketId: null,
       agentPlatform: null,
+      agentHostname: null,
       mobileDeviceId: null,
       pairedAt: null,
       lastActivityAt: now,
@@ -52,6 +53,7 @@ export class SessionService {
       | 'agentSocketId'
       | 'mobileSocketId'
       | 'agentPlatform'
+      | 'agentHostname'
       | 'mobileDeviceId'
       | 'pairedAt'
       | 'lastActivityAt'

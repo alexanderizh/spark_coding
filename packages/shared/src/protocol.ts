@@ -16,6 +16,8 @@ export const Events = {
 
   // Either → Server
   SESSION_PING:     'session:ping',
+  RUNTIME_ENSURE:   'runtime:ensure',
+  RUNTIME_STATUS:   'runtime:status',
 
   // Server → Client (both sides)
   SESSION_STATE:    'session:state',
@@ -25,12 +27,19 @@ export const Events = {
 
 export type EventName = typeof Events[keyof typeof Events];
 
+export const CliTypes = {
+  CLAUDE: 'claude',
+} as const;
+
+export type CliType = typeof CliTypes[keyof typeof CliTypes];
+
 // ── Payload types ────────────────────────────────────────────────────────────
 
 export interface AgentRegisterPayload {
   sessionToken: string;
   agentVersion: string;
   platform: string;  // 'linux' | 'darwin' | 'win32'
+  hostname: string;
 }
 
 export interface MobileJoinPayload {
@@ -61,6 +70,7 @@ export interface SessionStatePayload {
   state: SessionState;
   agentConnected: boolean;
   mobileConnected: boolean;
+  agentHostname?: string | null;
   timestamp: number;
 }
 
@@ -84,6 +94,20 @@ export interface SessionErrorPayload {
 
 export interface SessionPingPayload {
   sessionId: string;
+  timestamp: number;
+}
+
+export interface RuntimeEnsurePayload {
+  sessionId: string;
+  cliType: CliType;
+}
+
+export interface RuntimeStatusPayload {
+  sessionId: string;
+  cliType: CliType;
+  ready: boolean;
+  started: boolean;
+  message?: string;
   timestamp: number;
 }
 

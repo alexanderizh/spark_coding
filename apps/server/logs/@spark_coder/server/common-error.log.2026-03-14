@@ -8,3 +8,123 @@
   code: 'MIDWAY_10001',
   cause: undefined
 }
+2026-03-14 21:02:03.929 ERROR 29877 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:45:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:02:15.942 ERROR 78014 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:45:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:02:32.152 ERROR 78243 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:19:59.607 ERROR 93070 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:19:59.608 ERROR 93070 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:24:04.373 ERROR 5313 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:95:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:30:55.003 ERROR 11388 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:95:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:30:55.004 ERROR 11388 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:95:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:49:21.518 ERROR 21710 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:95:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:49:21.519 ERROR 21710 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:95:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:49:32.042 ERROR 46661 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:95:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 21:49:32.043 ERROR 46661 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:46:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:95:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}

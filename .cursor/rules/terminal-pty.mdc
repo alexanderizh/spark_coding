@@ -47,3 +47,10 @@ CLI 参数 `--server-url` 可临时覆盖。
 ## 模块解析
 
 若 `yarn dev:terminal` 报 `Cannot find module '@spark_coder/shared'`，先执行 `yarn install`（postinstall 会创建符号链接）；若仍失败，可执行 `rm -rf node_modules yarn.lock && yarn install` 重建。
+
+## Claude 运行态保障
+
+- 进入会话时由 mobile 发送 `runtime:ensure`，terminal agent 必须幂等处理。
+- `claude` 已在运行：回传 `runtime:status`（`ready=true, started=false`）。
+- `claude` 未运行：尝试 `pty.spawn()`，成功回传 `ready=true, started=true`。
+- 启动失败：回传 `ready=false` 与错误 `message`，不要静默吞错。

@@ -7,7 +7,8 @@
     "packages/*",
     "apps/server",
     "apps/terminal",
-    "apps/admin"
+    "apps/admin",
+    "apps/desktop"
   ],
   "scripts": {
     "postinstall": "node -e \"const fs=require('fs'),path=require('path');const p=path.join(process.cwd(),'node_modules/@spark_coder/shared');if(!fs.existsSync(p)){fs.mkdirSync(path.dirname(p),{recursive:true});fs.symlinkSync(path.join(process.cwd(),'packages/shared'),p,'dir');}\" && node scripts/fix-node-pty-permissions.js",
@@ -19,7 +20,11 @@
     "dev:admin": "yarn workspace admin dev",
     "build:admin": "yarn workspace admin build",
     "start:server": "yarn workspace @spark_coder/server start",
-    "start:terminal": "yarn workspace @spark_coder/terminal start"
+    "start:terminal": "yarn workspace @spark_coder/terminal start",
+    "dev:desktop": "yarn workspace @spark_coder/desktop dev",
+    "build:desktop": "yarn workspace @spark_coder/desktop build",
+    "dist:desktop:mac": "yarn workspace @spark_coder/desktop dist:mac",
+    "dist:desktop:win": "yarn workspace @spark_coder/desktop dist:win"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

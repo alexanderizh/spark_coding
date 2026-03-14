@@ -3,7 +3,7 @@ import { Table, Select, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSessions, type SessionItem } from '@/api/client';
-import styles from './index.less';
+import styles from './index.module.less';
 
 const STATE_LABELS: Record<string, string> = {
   waiting_for_agent: '等待主机',

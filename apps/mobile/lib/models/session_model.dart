@@ -45,6 +45,7 @@ class SessionModel {
     required this.sessionId,
     required this.token,
     required this.serverUrl,
+    this.agentHostname,
     this.state = SessionState.unknown,
     this.agentConnected = false,
     this.mobileConnected = false,
@@ -59,6 +60,9 @@ class SessionModel {
 
   /// The relay server URL parsed from the QR code.
   final String serverUrl;
+
+  /// Host machine name where the terminal agent is running.
+  final String? agentHostname;
 
   /// The current session lifecycle state.
   final SessionState state;
@@ -83,6 +87,7 @@ class SessionModel {
     String? sessionId,
     String? token,
     String? serverUrl,
+    String? agentHostname,
     SessionState? state,
     bool? agentConnected,
     bool? mobileConnected,
@@ -92,6 +97,7 @@ class SessionModel {
       sessionId: sessionId ?? this.sessionId,
       token: token ?? this.token,
       serverUrl: serverUrl ?? this.serverUrl,
+      agentHostname: agentHostname ?? this.agentHostname,
       state: state ?? this.state,
       agentConnected: agentConnected ?? this.agentConnected,
       mobileConnected: mobileConnected ?? this.mobileConnected,
@@ -103,6 +109,7 @@ class SessionModel {
     'sessionId': sessionId,
     'token': token,
     'serverUrl': serverUrl,
+    'agentHostname': agentHostname,
     'state': state.value,
     'agentConnected': agentConnected,
     'mobileConnected': mobileConnected,
@@ -113,6 +120,7 @@ class SessionModel {
     sessionId: json['sessionId'] as String,
     token: json['token'] as String,
     serverUrl: json['serverUrl'] as String,
+    agentHostname: json['agentHostname'] as String?,
     state: SessionState.fromString(json['state'] as String? ?? 'unknown'),
     agentConnected: json['agentConnected'] as bool? ?? false,
     mobileConnected: json['mobileConnected'] as bool? ?? false,
@@ -126,6 +134,7 @@ class SessionModel {
         other.sessionId == sessionId &&
         other.token == token &&
         other.serverUrl == serverUrl &&
+        other.agentHostname == agentHostname &&
         other.state == state &&
         other.agentConnected == agentConnected &&
         other.mobileConnected == mobileConnected &&
@@ -137,6 +146,7 @@ class SessionModel {
     sessionId,
     token,
     serverUrl,
+    agentHostname,
     state,
     agentConnected,
     mobileConnected,

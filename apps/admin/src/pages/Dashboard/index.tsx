@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, Row, Col, Statistic, List, Button, Spin } from 'antd';
-import { Link } from 'umi';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getStats, type AdminStats } from '@/api/client';
-import styles from './index.less';
+import styles from './index.module.less';
 
 const STATE_LABELS: Record<string, string> = {
   waiting_for_agent: '等待主机',
