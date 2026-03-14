@@ -10,7 +10,7 @@
     "apps/admin"
   ],
   "scripts": {
-    "postinstall": "node -e \"const fs=require('fs'),path=require('path');const p=path.join(process.cwd(),'node_modules/@spark_coder/shared');if(!fs.existsSync(p)){fs.mkdirSync(path.dirname(p),{recursive:true});fs.symlinkSync(path.join(process.cwd(),'packages/shared'),p,'dir');}\"",
+    "postinstall": "node -e \"const fs=require('fs'),path=require('path');const p=path.join(process.cwd(),'node_modules/@spark_coder/shared');if(!fs.existsSync(p)){fs.mkdirSync(path.dirname(p),{recursive:true});fs.symlinkSync(path.join(process.cwd(),'packages/shared'),p,'dir');}\" && node scripts/fix-node-pty-permissions.js",
     "build:shared": "yarn workspace @spark_coder/shared build",
     "build:server": "yarn workspace @spark_coder/server build",
     "build:terminal": "yarn workspace @spark_coder/terminal build",

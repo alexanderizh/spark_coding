@@ -15,7 +15,9 @@ alwaysApply: false
 yarn/npm 安装 node-pty prebuilt 时，`spawn-helper` 二进制的执行权限（`+x`）会丢失。
 node-pty 所有 spawn 操作都依赖该 helper，一旦它不可执行，**任何 pty.spawn() 都会失败**，与目标程序的路径无关。
 
-**修复**（安装后执行一次）：
+**自动修复**：根目录 `postinstall` 已包含 `scripts/fix-node-pty-permissions.js`，`yarn install` 时会自动为当前平台修复权限，用户无需手动操作。
+
+若自动修复失败（如无写权限），可手动执行：
 ```bash
 chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper
 # 如果是 x64 机器：
