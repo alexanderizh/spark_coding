@@ -10,35 +10,25 @@ export type OutputCallback = (data: string, seq: number) => void;
 /**
  * 解析可执行文件路径：若为裸命令名则解析为绝对路径。
  * node-pty 的 posix_spawnp 需要绝对路径，不会自动搜索 PATH。
- * - Unix/macOS: 使用 which
+ * - Unix/macOS: 使用 which（保持原有逻辑不变）
  * - Windows: 使用 where（等效于 which）
  */
 function resolveExecutablePath(command: string): string {
   if (command.includes('/') || (process.platform === 'win32' && command.includes('\\'))) {
     return command;
   }
-
   if (process.platform === 'win32') {
-    return resolveExecutablePathWindows(command);
+    try {
+      const resolved = execFileSync('where', [command], { encoding: 'utf8' }).trim();
+      const first = resolved.split(/\r?\n/)[0]?.trim();
+      return first || command;
+    } catch {
+      return command;
+    }
   }
-  return resolveExecutablePathUnix(command);
-}
-
-function resolveExecutablePathUnix(command: string): string {
   try {
     const resolved = execFileSync('which', [command], { encoding: 'utf8' }).trim();
     return resolved || command;
-  } catch {
-    return command;
-  }
-}
-
-function resolveExecutablePathWindows(command: string): string {
-  try {
-    const resolved = execFileSync('where', [command], { encoding: 'utf8' }).trim();
-    // where 可能返回多行（PATH 中多个匹配），取第一行（实际执行的那个）
-    const first = resolved.split(/\r?\n/)[0]?.trim();
-    return first || command;
   } catch {
     return command;
   }
