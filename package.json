@@ -1,0 +1,23 @@
+{
+  "name": "remote-claude",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remote control Claude CLI from mobile via QR-code pairing",
+  "workspaces": [
+    "packages/*",
+    "apps/server",
+    "apps/terminal"
+  ],
+  "scripts": {
+    "build:shared": "yarn workspace @remote-claude/shared build",
+    "build:server": "yarn workspace @remote-claude/server build",
+    "build:terminal": "yarn workspace @remote-claude/terminal build",
+    "dev:server": "yarn workspace @remote-claude/server dev",
+    "dev:terminal": "yarn workspace @remote-claude/terminal dev",
+    "start:server": "yarn workspace @remote-claude/server start",
+    "start:terminal": "yarn workspace @remote-claude/terminal start"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

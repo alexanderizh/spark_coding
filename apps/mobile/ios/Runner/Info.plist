@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App display name -->
+	<key>CFBundleDisplayName</key>
+	<string>Remote Claude</string>
+
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+
+	<key>CFBundleName</key>
+	<string>remote_claude_mobile</string>
+
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+
+	<key>CFBundleSignature</key>
+	<string>????</string>
+
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+
+	<!-- ---------------------------------------------------------------
+	     Camera permission — required for QR code scanning.
+	     The system will display this string to the user in the
+	     permission dialog. Make it descriptive and user-friendly.
+	     --------------------------------------------------------------- -->
+	<key>NSCameraUsageDescription</key>
+	<string>Remote Claude needs camera access to scan the QR code displayed in your host terminal and pair with the relay server.</string>
+
+	<!-- ---------------------------------------------------------------
+	     App Transport Security — allows insecure HTTP/WS connections
+	     to localhost and local network addresses during development.
+	     Restrict or remove these entries for App Store production builds.
+	     --------------------------------------------------------------- -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<!-- Allow plain HTTP/WS to localhost for local dev server -->
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+
+	<!-- ---------------------------------------------------------------
+	     Custom URL scheme: remoteclaude://pair?token=…&server=…
+	     Registered so the OS can route deep links to this app.
+	     --------------------------------------------------------------- -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.remoteclaude.mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>remoteclaude</string>
+			</array>
+		</dict>
+	</dict>
+
+	<!-- Local network usage description (iOS 14+) — required when
+	     connecting to devices on the local network. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Remote Claude connects to your local relay server to control Claude CLI on your host machine.</string>
+
+	<!-- Bonjour services used for local network discovery (if applicable) -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+		<string>_https._tcp</string>
+	</array>
+
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+</dict>
+</plist>

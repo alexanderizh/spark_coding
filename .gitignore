@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.js.map
+*.d.ts.map
+.env
+data/
+*.db
+
+# Flutter
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+apps/mobile/pubspec.lock
