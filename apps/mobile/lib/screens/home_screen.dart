@@ -7,6 +7,7 @@ import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
 import '../services/session_service.dart';
+import '../utils/app_logger.dart';
 import '../widgets/connection_badge.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -38,33 +39,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _reconnectLastSession() async {
+    AppLogger.info('HomeScreen', '重连上次会话');
     final sessionService = ref.read(sessionServiceProvider);
     final serverUrl = sessionService.serverUrl;
     final token = sessionService.token;
     final sessionId = sessionService.sessionId;
 
     if (serverUrl == null || token == null || sessionId == null) {
+      AppLogger.warn('HomeScreen', '无已保存会话', 'serverUrl=$serverUrl');
       _showError('No saved session found. Please scan a QR code.');
       return;
     }
 
+    AppLogger.info(
+      'HomeScreen',
+      '重连 — serverUrl: $serverUrl, sessionId: $sessionId',
+    );
+
     // Initialise the session model before connecting.
-    ref.read(sessionNotifierProvider.notifier).initSession(
-          sessionId: sessionId,
-          token: token,
-          serverUrl: serverUrl,
-        );
+    ref
+        .read(sessionNotifierProvider.notifier)
+        .initSession(sessionId: sessionId, token: token, serverUrl: serverUrl);
 
     // Reset terminal state for the new session.
     ref.read(terminalNotifierProvider.notifier).reset();
 
-    await ref.read(connectionNotifierProvider.notifier).connect(
-          serverUrl: serverUrl,
-          token: token,
-          sessionId: sessionId,
-        );
+    await ref
+        .read(connectionNotifierProvider.notifier)
+        .connect(serverUrl: serverUrl, token: token, sessionId: sessionId);
 
     if (!mounted) return;
+    AppLogger.info('HomeScreen', '重连请求已发送，跳转到终端');
     context.go(AppRoutes.terminal);
   }
 
@@ -116,26 +121,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             border: Border.all(color: const Color(0xFF00FF41), width: 2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
-            Icons.terminal,
-            size: 48,
-            color: Color(0xFF00FF41),
-          ),
+          child: const Icon(Icons.terminal, size: 48, color: Color(0xFF00FF41)),
         ),
         const SizedBox(height: 20),
         Text(
           'REMOTE CLAUDE',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontSize: 22,
-                letterSpacing: 4,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontSize: 22, letterSpacing: 4),
         ),
         const SizedBox(height: 8),
         Text(
           'Mobile terminal controller',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                letterSpacing: 1.5,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(letterSpacing: 1.5),
         ),
       ],
     );
@@ -146,9 +146,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ConnectionBadge(status: status),
-          ],
+          children: [ConnectionBadge(status: status)],
         ),
         if (serverUrl != null && serverUrl.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -214,8 +212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
                 ),
               ),
               const SizedBox(width: 12),

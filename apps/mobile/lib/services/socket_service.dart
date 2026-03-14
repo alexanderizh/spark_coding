@@ -5,6 +5,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../models/claude_prompt_model.dart';
 import '../models/session_model.dart';
+import '../utils/app_logger.dart';
 
 /// Manages the Socket.IO connection to the relay server and exposes typed
 /// streams for all inbound events, as well as methods for all outbound events.
@@ -21,14 +22,11 @@ class SocketService {
 
   final _terminalOutputController =
       StreamController<TerminalOutput>.broadcast();
-  final _claudePromptsController =
-      StreamController<ClaudePrompt>.broadcast();
+  final _claudePromptsController = StreamController<ClaudePrompt>.broadcast();
   final _sessionStatesController =
       StreamController<SessionStateEvent>.broadcast();
-  final _sessionPairsController =
-      StreamController<SessionPair>.broadcast();
-  final _sessionErrorsController =
-      StreamController<SessionError>.broadcast();
+  final _sessionPairsController = StreamController<SessionPair>.broadcast();
+  final _sessionErrorsController = StreamController<SessionError>.broadcast();
   final _connectionStatusController =
       StreamController<SocketConnectionStatus>.broadcast();
 
@@ -37,8 +35,7 @@ class SocketService {
   // ---------------------------------------------------------------------------
 
   /// Raw terminal output chunks from the host agent.
-  Stream<TerminalOutput> get terminalOutput =>
-      _terminalOutputController.stream;
+  Stream<TerminalOutput> get terminalOutput => _terminalOutputController.stream;
 
   /// Interactive Claude prompts detected by the host agent.
   Stream<ClaudePrompt> get claudePrompts => _claudePromptsController.stream;
@@ -73,8 +70,14 @@ class SocketService {
     required String sessionId,
     required String deviceId,
   }) async {
+    AppLogger.info(
+      'SocketService',
+      'connect — serverUrl: $serverUrl, sessionId: $sessionId',
+    );
+
     // Clean up any existing connection before establishing a new one.
     await disconnect();
+    AppLogger.info('SocketService', '已断开旧连接，创建新 socket');
 
     _currentSessionId = sessionId;
 
@@ -82,14 +85,11 @@ class SocketService {
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
-          .setAuth({
-            'token': token,
-            'role': 'mobile',
-          })
+          .setAuth({'token': token, 'role': 'mobile'})
           .enableReconnection()
           .setReconnectionDelay(1000)
           .setReconnectionDelayMax(30000)
-          .setReconnectionAttempts(double.infinity.toInt())
+          // 不设置 setReconnectionAttempts，使用默认值 Infinity（无限重连）
           .setTimeout(10000)
           .build(),
     );
@@ -100,6 +100,7 @@ class SocketService {
       deviceId: deviceId,
     );
 
+    AppLogger.info('SocketService', 'Socket 已创建，等待连接（autoConnect=true，连接为异步）');
     // socket_io_client connects automatically; no explicit .connect() needed
     // when autoConnect is true (which is the default).
   }
@@ -155,41 +156,43 @@ class SocketService {
     final socket = _socket!;
 
     socket.onConnect((_) {
-      debugPrint('[SocketService] Connected to relay server');
+      AppLogger.info('SocketService', 'onConnect: 已连接到中继服务器');
       _connectionStatusController.add(SocketConnectionStatus.connected);
 
       // Emit join immediately upon (re)connection.
-      socket.emit('mobile:join', {
-        'sessionToken': token,
-        'deviceId': deviceId,
-      });
+      socket.emit('mobile:join', {'sessionToken': token, 'deviceId': deviceId});
+      AppLogger.info('SocketService', '已发送 mobile:join');
 
       _startPing(sessionId);
     });
 
     socket.onDisconnect((reason) {
-      debugPrint('[SocketService] Disconnected: $reason');
+      AppLogger.warn('SocketService', 'onDisconnect: 断开连接', reason);
       _stopPing();
       _connectionStatusController.add(SocketConnectionStatus.disconnected);
     });
 
     socket.onConnectError((error) {
-      debugPrint('[SocketService] Connection error: $error');
+      AppLogger.error(
+        'SocketService',
+        'onConnectError: 连接失败（请检查 serverUrl、网络、服务器是否启动）',
+        error,
+      );
       _connectionStatusController.add(SocketConnectionStatus.error);
     });
 
     socket.onError((error) {
-      debugPrint('[SocketService] Socket error: $error');
+      AppLogger.error('SocketService', 'onError: Socket 错误', error);
       _connectionStatusController.add(SocketConnectionStatus.error);
     });
 
     socket.onReconnect((_) {
-      debugPrint('[SocketService] Reconnected');
+      AppLogger.info('SocketService', 'onReconnect: 重连成功');
       _connectionStatusController.add(SocketConnectionStatus.connected);
     });
 
     socket.onReconnecting((_) {
-      debugPrint('[SocketService] Reconnecting...');
+      AppLogger.info('SocketService', 'onReconnecting: 正在重连...');
       _connectionStatusController.add(SocketConnectionStatus.reconnecting);
     });
 
@@ -240,12 +243,13 @@ class SocketService {
     // ------------------------------------------------------------------
     socket.on('session:pair', (data) {
       try {
+        AppLogger.info('SocketService', 'session:pair: 配对成功');
         final map = _toMap(data);
         if (map != null) {
           _sessionPairsController.add(SessionPair.fromJson(map));
         }
       } catch (e) {
-        debugPrint('[SocketService] Error parsing session:pair: $e');
+        AppLogger.error('SocketService', '解析 session:pair 失败', e);
       }
     });
 
@@ -254,12 +258,17 @@ class SocketService {
     // ------------------------------------------------------------------
     socket.on('session:error', (data) {
       try {
+        AppLogger.error(
+          'SocketService',
+          'session:error 服务端错误',
+          data is Map ? data['message'] ?? data : data,
+        );
         final map = _toMap(data);
         if (map != null) {
           _sessionErrorsController.add(SessionError.fromJson(map));
         }
       } catch (e) {
-        debugPrint('[SocketService] Error parsing session:error: $e');
+        AppLogger.error('SocketService', '解析 session:error 失败', e);
       }
     });
   }
@@ -303,12 +312,7 @@ class SocketService {
 
 /// Raw socket connection status (separate from the high-level [ConnectionStatus]
 /// tracked by the connection provider).
-enum SocketConnectionStatus {
-  connected,
-  disconnected,
-  reconnecting,
-  error,
-}
+enum SocketConnectionStatus { connected, disconnected, reconnecting, error }
 
 /// Typed wrapper for a `session:state` event payload.
 class SessionStateEvent {

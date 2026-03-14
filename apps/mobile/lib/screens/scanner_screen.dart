@@ -9,6 +9,7 @@ import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
 import '../services/session_service.dart';
+import '../utils/app_logger.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({super.key});
@@ -61,12 +62,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final rawValue = barcodes.first.rawValue;
     if (rawValue == null || rawValue.isEmpty) return;
 
+    AppLogger.info('Scanner', '检测到二维码，原始长度: ${rawValue.length}');
     _processQrCode(rawValue);
   }
 
   Future<void> _processQrCode(String rawValue) async {
     if (_isProcessing) return;
 
+    AppLogger.info('Scanner', '开始处理二维码: ${rawValue.length} 字符');
     setState(() {
       _isProcessing = true;
       _errorMessage = null;
@@ -78,6 +81,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     try {
       final parsed = _parseRemoteClaudeUrl(rawValue);
       if (parsed == null) {
+        AppLogger.warn('Scanner', '二维码格式无效', rawValue);
         _showError(
           'Invalid QR code. Expected format:\n'
           'remoteclaude://pair?token=…&server=…',
@@ -86,6 +90,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       }
 
       final (token, serverUrl, sessionId) = parsed;
+      AppLogger.info(
+        'Scanner',
+        '解析成功 — server: $serverUrl, sessionId: $sessionId, token长度: ${token.length}',
+      );
 
       // Persist session credentials.
       final sessionService = ref.read(sessionServiceProvider);
@@ -94,9 +102,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         token: token,
         sessionId: sessionId,
       );
+      AppLogger.info('Scanner', '会话已保存');
 
       // Initialise session model.
-      ref.read(sessionNotifierProvider.notifier).initSession(
+      ref
+          .read(sessionNotifierProvider.notifier)
+          .initSession(
             sessionId: sessionId,
             token: token,
             serverUrl: serverUrl,
@@ -106,15 +117,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       ref.read(terminalNotifierProvider.notifier).reset();
 
       // Connect to relay server.
-      await ref.read(connectionNotifierProvider.notifier).connect(
-            serverUrl: serverUrl,
-            token: token,
-            sessionId: sessionId,
-          );
+      AppLogger.info('Scanner', '正在连接中继服务器: $serverUrl');
+      await ref
+          .read(connectionNotifierProvider.notifier)
+          .connect(serverUrl: serverUrl, token: token, sessionId: sessionId);
 
       if (!mounted) return;
+      AppLogger.info('Scanner', '连接成功，跳转到终端页');
       context.go(AppRoutes.terminal);
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger.error('Scanner', '处理二维码失败', e, st);
       _showError('Failed to process QR code: $e');
     }
   }
@@ -129,14 +141,30 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     try {
       final uri = Uri.parse(raw);
 
-      if (uri.scheme != 'remoteclaude') return null;
-      if (uri.host != 'pair') return null;
+      if (uri.scheme != 'remoteclaude') {
+        AppLogger.warn(
+          'Scanner',
+          '解析失败: scheme 不是 remoteclaude',
+          'scheme=${uri.scheme}',
+        );
+        return null;
+      }
+      if (uri.host != 'pair') {
+        AppLogger.warn('Scanner', '解析失败: host 不是 pair', 'host=${uri.host}');
+        return null;
+      }
 
       final token = uri.queryParameters['token'];
       final server = uri.queryParameters['server'];
 
-      if (token == null || token.isEmpty) return null;
-      if (server == null || server.isEmpty) return null;
+      if (token == null || token.isEmpty) {
+        AppLogger.warn('Scanner', '解析失败: token 为空');
+        return null;
+      }
+      if (server == null || server.isEmpty) {
+        AppLogger.warn('Scanner', '解析失败: server 为空');
+        return null;
+      }
 
       // session parameter is optional — some server implementations embed the
       // session ID directly in the QR code.
@@ -147,16 +175,23 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       if (!serverUri.hasScheme ||
           (!serverUri.scheme.startsWith('http') &&
               !serverUri.scheme.startsWith('ws'))) {
+        AppLogger.warn(
+          'Scanner',
+          '解析失败: server URL 格式无效',
+          'scheme=${serverUri.scheme}',
+        );
         return null;
       }
 
       return (token, server, sessionId);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.error('Scanner', '解析 URL 异常', e, st);
       return null;
     }
   }
 
   void _showError(String message) {
+    AppLogger.warn('Scanner', '显示错误给用户', message);
     if (!mounted) return;
     setState(() {
       _errorMessage = message;
@@ -175,10 +210,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         children: [
           // Camera / scanner layer
           if (_hasPermission)
-            MobileScanner(
-              controller: _scannerController,
-              onDetect: _onDetect,
-            )
+            MobileScanner(controller: _scannerController, onDetect: _onDetect)
           else
             _buildPermissionView(),
 
@@ -234,8 +266,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             const Padding(
               padding: EdgeInsets.only(bottom: 40),
               child: CircularProgressIndicator(
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
               ),
             )
           else
@@ -258,14 +289,38 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         children: [
           // Semi-transparent background outside the frame is handled by the
           // MobileScanner overlay. Here we just draw the corner accents.
-          _corner(cornerColor, cornerLength, cornerThickness,
-              top: 0, left: 0, topLeft: true),
-          _corner(cornerColor, cornerLength, cornerThickness,
-              top: 0, right: 0, topRight: true),
-          _corner(cornerColor, cornerLength, cornerThickness,
-              bottom: 0, left: 0, bottomLeft: true),
-          _corner(cornerColor, cornerLength, cornerThickness,
-              bottom: 0, right: 0, bottomRight: true),
+          _corner(
+            cornerColor,
+            cornerLength,
+            cornerThickness,
+            top: 0,
+            left: 0,
+            topLeft: true,
+          ),
+          _corner(
+            cornerColor,
+            cornerLength,
+            cornerThickness,
+            top: 0,
+            right: 0,
+            topRight: true,
+          ),
+          _corner(
+            cornerColor,
+            cornerLength,
+            cornerThickness,
+            bottom: 0,
+            left: 0,
+            bottomLeft: true,
+          ),
+          _corner(
+            cornerColor,
+            cornerLength,
+            cornerThickness,
+            bottom: 0,
+            right: 0,
+            bottomRight: true,
+          ),
         ],
       ),
     );

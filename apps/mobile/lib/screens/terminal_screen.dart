@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +12,7 @@ import '../providers/prompt_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
 import '../services/socket_service.dart';
+import '../utils/app_logger.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/input_toolbar.dart';
 import '../widgets/prompt_overlay.dart';
@@ -42,6 +44,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   void _listenForErrors() {
     final socketService = ref.read(socketServiceProvider);
     _errorSub = socketService.sessionErrors.listen((error) {
+      AppLogger.error('TerminalScreen', '收到服务端 session 错误', error.message);
       if (!mounted) return;
       _showSessionError(error.message);
     });
@@ -56,23 +59,30 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         action: SnackBarAction(
           label: 'Dismiss',
           textColor: const Color(0xFFFF5252),
-          onPressed: () =>
-              ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+          onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
         ),
       ),
     );
   }
 
   Future<void> _reconnect() async {
+    AppLogger.info('TerminalScreen', '用户点击 RETRY 重连');
     final session = ref.read(sessionProvider);
     if (session == null) {
+      AppLogger.warn('TerminalScreen', '无 session，返回首页');
       context.go(AppRoutes.home);
       return;
     }
 
     setState(() => _showReconnectBanner = false);
 
-    await ref.read(connectionNotifierProvider.notifier).connect(
+    AppLogger.info(
+      'TerminalScreen',
+      '重连 — serverUrl: ${session.serverUrl}, sessionId: ${session.sessionId}',
+    );
+    await ref
+        .read(connectionNotifierProvider.notifier)
+        .connect(
           serverUrl: session.serverUrl,
           token: session.token,
           sessionId: session.sessionId,
@@ -92,7 +102,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     final currentPrompt = ref.watch(currentPromptProvider);
 
     // Show reconnect banner when disconnected
-    final showBanner = connectionStatus == ConnectionStatus.disconnected ||
+    final showBanner =
+        connectionStatus == ConnectionStatus.disconnected ||
         connectionStatus == ConnectionStatus.error;
 
     return Scaffold(
@@ -122,9 +133,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                 // Terminal view
                 TerminalViewWidget(
                   onResize: (cols, rows) {
-                    ref
-                        .read(socketServiceProvider)
-                        .sendResize(cols, rows);
+                    ref.read(socketServiceProvider).sendResize(cols, rows);
                   },
                 ),
 
@@ -157,7 +166,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   }
 
   PreferredSizeWidget _buildAppBar(
-      BuildContext context, ConnectionStatus status) {
+    BuildContext context,
+    ConnectionStatus status,
+  ) {
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios, size: 18),
@@ -185,7 +196,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
 // Reconnect banner widget
 // ---------------------------------------------------------------------------
 
-class _ReconnectBanner extends StatelessWidget {
+class _ReconnectBanner extends StatefulWidget {
   const _ReconnectBanner({
     super.key,
     required this.onReconnect,
@@ -200,38 +211,118 @@ class _ReconnectBanner extends StatelessWidget {
   final String? errorMessage;
 
   @override
+  State<_ReconnectBanner> createState() => _ReconnectBannerState();
+}
+
+class _ReconnectBannerState extends State<_ReconnectBanner> {
+  bool _expanded = false;
+
+  String get _displayText =>
+      widget.errorMessage ??
+      (widget.isError
+          ? 'Connection error. Tap to retry.'
+          : 'Disconnected from relay server.');
+
+  Future<void> _copyToClipboard() async {
+    await Clipboard.setData(ClipboardData(text: _displayText));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已复制到剪贴板'),
+        backgroundColor: Color(0xFF1A3A1A),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      color: isError ? const Color(0xFF2A0A0A) : const Color(0xFF1A1A0A),
+      color: widget.isError ? const Color(0xFF2A0A0A) : const Color(0xFF1A1A0A),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            isError ? Icons.error_outline : Icons.wifi_off,
+            widget.isError ? Icons.error_outline : Icons.wifi_off,
             size: 18,
-            color: isError ? const Color(0xFFFF5252) : const Color(0xFFFFB300),
+            color: widget.isError
+                ? const Color(0xFFFF5252)
+                : const Color(0xFFFFB300),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              errorMessage ??
-                  (isError
-                      ? 'Connection error. Tap to retry.'
-                      : 'Disconnected from relay server.'),
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: isError
-                    ? const Color(0xFFFF8A80)
-                    : const Color(0xFFFFE082),
+            child: InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Tooltip(
+                message: _expanded ? '点击收起' : '点击展开查看详情',
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _displayText,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          color: widget.isError
+                              ? const Color(0xFFFF8A80)
+                              : const Color(0xFFFFE082),
+                        ),
+                        maxLines: _expanded ? null : 1,
+                        overflow: _expanded ? null : TextOverflow.ellipsis,
+                      ),
+                      if (_expanded)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              Text(
+                                '点击收起',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  color: Colors.white38,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              InkWell(
+                                onTap: _copyToClipboard,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.copy,
+                                      size: 14,
+                                      color: Colors.white54,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '复制',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                        color: Colors.white54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
           InkWell(
-            onTap: onReconnect,
+            onTap: widget.onReconnect,
             child: const Text(
               'RETRY',
               style: TextStyle(
@@ -244,7 +335,7 @@ class _ReconnectBanner extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           InkWell(
-            onTap: onDisconnect,
+            onTap: widget.onDisconnect,
             child: const Text(
               'QUIT',
               style: TextStyle(

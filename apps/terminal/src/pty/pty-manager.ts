@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 import * as pty from 'node-pty';
 import { AgentConfig } from '../utils/config';
 
@@ -5,6 +6,19 @@ const BATCH_INTERVAL_MS = 16;   // ~60fps output batching
 const RING_BUFFER_SIZE  = 1024 * 1024; // 1 MB disconnect buffer
 
 export type OutputCallback = (data: string, seq: number) => void;
+
+/** 解析可执行文件路径：若为裸命令名则通过 which 解析为绝对路径，避免 posix_spawnp 在 PATH 受限时失败 */
+function resolveExecutablePath(command: string): string {
+  if (command.includes('/') || (process.platform === 'win32' && command.includes('\\'))) {
+    return command;
+  }
+  try {
+    const resolved = execFileSync('which', [command], { encoding: 'utf8' }).trim();
+    return resolved || command;
+  } catch {
+    return command;
+  }
+}
 
 export class PtyManager {
   private ptyProcess: pty.IPty | null = null;
@@ -24,19 +38,29 @@ export class PtyManager {
   spawn(config: AgentConfig): void {
     if (this.ptyProcess) return;
 
-    this.ptyProcess = pty.spawn(config.claudePath, [], {
-      name: 'xterm-256color',
-      cols: 220,
-      rows: 50,
-      cwd: config.cwd,
-      env: {
-        ...process.env,
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-        LANG: 'en_US.UTF-8',
-        // Do NOT set CI=1, NO_COLOR, or FORCE_COLOR=0 — breaks interactive prompts
-      } as { [key: string]: string },
-    });
+    const executablePath = resolveExecutablePath(config.claudePath);
+    try {
+      this.ptyProcess = pty.spawn(executablePath, [], {
+        name: 'xterm-256color',
+        cols: 220,
+        rows: 50,
+        cwd: config.cwd,
+        env: {
+          ...process.env,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          LANG: 'en_US.UTF-8',
+          // Do NOT set CI=1, NO_COLOR, or FORCE_COLOR=0 — breaks interactive prompts
+        } as { [key: string]: string },
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[error] 无法启动 Claude CLI: ${msg}`);
+      console.error(`  尝试路径: ${executablePath}`);
+      console.error('  请确保已安装 Claude CLI，或通过 --claude-path 指定可执行文件路径');
+      console.error('  示例: yarn dev:terminal -- --claude-path /path/to/claude');
+      throw err;
+    }
 
     this.ptyProcess.onData((data: string) => {
       // Feed prompt detector

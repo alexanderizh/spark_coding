@@ -1,6 +1,5 @@
 import { WSController, OnWSConnection, OnWSDisConnection, OnWSMessage, Inject, App } from '@midwayjs/decorator';
-import { Application } from '@midwayjs/socketio';
-import { Socket } from 'socket.io';
+import { Application, Context } from '@midwayjs/socketio';
 import { SessionService } from '../service/session.service';
 import {
   Events,
@@ -35,8 +34,11 @@ const socketMeta = new Map<string, SocketMeta>();
 
 @WSController('/')
 export class RelayController {
-  @App()
+  @App('socketIO')
   app: Application;
+
+  @Inject('socket')
+  ctx: Context;
 
   @Inject()
   sessionService: SessionService;
@@ -44,24 +46,25 @@ export class RelayController {
   // ── Connection ──────────────────────────────────────────────────────────────
 
   @OnWSConnection()
-  async onConnect(socket: Socket) {
+  async onConnect() {
+    const socket = this.ctx;
     const token = socket.handshake.auth?.token as string;
-    const role  = socket.handshake.auth?.role as 'agent' | 'mobile';
+    const role = socket.handshake.auth?.role as 'agent' | 'mobile';
 
     if (!token || !['agent', 'mobile'].includes(role)) {
-      this.sendError(socket, SessionErrorCode.INVALID_TOKEN, 'Missing or invalid auth');
+      this.sendError(SessionErrorCode.INVALID_TOKEN, 'Missing or invalid auth');
       socket.disconnect(true);
       return;
     }
 
     const session = await this.sessionService.findByToken(token);
     if (!session) {
-      this.sendError(socket, SessionErrorCode.SESSION_NOT_FOUND, 'Session not found');
+      this.sendError(SessionErrorCode.SESSION_NOT_FOUND, 'Session not found');
       socket.disconnect(true);
       return;
     }
     if (this.sessionService.isExpired(session)) {
-      this.sendError(socket, SessionErrorCode.SESSION_EXPIRED, 'Session has expired');
+      this.sendError(SessionErrorCode.SESSION_EXPIRED, 'Session has expired');
       socket.disconnect(true);
       return;
     }
@@ -81,7 +84,8 @@ export class RelayController {
   // ── Disconnect ──────────────────────────────────────────────────────────────
 
   @OnWSDisConnection()
-  async onDisconnect(socket: Socket) {
+  async onDisconnect(_reason: string) {
+    const socket = this.ctx;
     const meta = socketMeta.get(socket.id);
     if (!meta) return;
     socketMeta.delete(socket.id);
@@ -108,15 +112,16 @@ export class RelayController {
   // ── Agent events ────────────────────────────────────────────────────────────
 
   @OnWSMessage(Events.AGENT_REGISTER)
-  async onAgentRegister(socket: Socket, payload: AgentRegisterPayload) {
-    const meta = this.verifyRole(socket, 'agent');
+  async onAgentRegister(payload: AgentRegisterPayload) {
+    const meta = this.verifyRole('agent');
     if (!meta) return;
 
+    const socket = this.ctx;
     const session = await this.sessionService.findById(meta.sessionId);
     if (!session) return;
 
     if (session.agentSocketId && session.agentSocketId !== socket.id) {
-      this.sendError(socket, SessionErrorCode.AGENT_ALREADY_CONNECTED, 'Another agent is already connected');
+      this.sendError(SessionErrorCode.AGENT_ALREADY_CONNECTED, 'Another agent is already connected');
       return;
     }
 
@@ -131,36 +136,37 @@ export class RelayController {
   }
 
   @OnWSMessage(Events.TERMINAL_OUTPUT)
-  async onTerminalOutput(socket: Socket, payload: TerminalOutputPayload) {
-    const meta = this.verifyRole(socket, 'agent');
+  async onTerminalOutput(payload: TerminalOutputPayload) {
+    const meta = this.verifyRole('agent');
     if (!meta || !this.checkRateLimit(meta)) return;
     if (!this.checkPayloadSize(payload.data)) return;
 
     await this.sessionService.touchActivity(meta.sessionId);
 
     // Forward only to mobile sockets in the room
-    socket.to(meta.sessionId).emit(Events.TERMINAL_OUTPUT, payload);
+    this.ctx.to(meta.sessionId).emit(Events.TERMINAL_OUTPUT, payload);
   }
 
   @OnWSMessage(Events.CLAUDE_PROMPT)
-  async onClaudePrompt(socket: Socket, payload: ClaudePromptPayload) {
-    const meta = this.verifyRole(socket, 'agent');
+  async onClaudePrompt(payload: ClaudePromptPayload) {
+    const meta = this.verifyRole('agent');
     if (!meta) return;
-    socket.to(meta.sessionId).emit(Events.CLAUDE_PROMPT, payload);
+    this.ctx.to(meta.sessionId).emit(Events.CLAUDE_PROMPT, payload);
   }
 
   // ── Mobile events ───────────────────────────────────────────────────────────
 
   @OnWSMessage(Events.MOBILE_JOIN)
-  async onMobileJoin(socket: Socket, payload: MobileJoinPayload) {
-    const meta = this.verifyRole(socket, 'mobile');
+  async onMobileJoin(payload: MobileJoinPayload) {
+    const meta = this.verifyRole('mobile');
     if (!meta) return;
 
+    const socket = this.ctx;
     const session = await this.sessionService.findById(meta.sessionId);
     if (!session) return;
 
     if (!session.agentSocketId) {
-      this.sendError(socket, SessionErrorCode.SESSION_NOT_FOUND, 'Agent is not yet connected');
+      this.sendError(SessionErrorCode.SESSION_NOT_FOUND, 'Agent is not yet connected');
       return;
     }
 
@@ -185,37 +191,37 @@ export class RelayController {
   }
 
   @OnWSMessage(Events.TERMINAL_INPUT)
-  async onTerminalInput(socket: Socket, payload: TerminalInputPayload) {
-    const meta = this.verifyRole(socket, 'mobile');
+  async onTerminalInput(payload: TerminalInputPayload) {
+    const meta = this.verifyRole('mobile');
     if (!meta || !this.checkRateLimit(meta)) return;
     if (!this.checkPayloadSize(payload.data)) return;
 
-    socket.to(meta.sessionId).emit(Events.TERMINAL_INPUT, payload);
+    this.ctx.to(meta.sessionId).emit(Events.TERMINAL_INPUT, payload);
   }
 
   @OnWSMessage(Events.TERMINAL_RESIZE)
-  async onTerminalResize(socket: Socket, payload: TerminalResizePayload) {
-    const meta = this.verifyRole(socket, 'mobile');
+  async onTerminalResize(payload: TerminalResizePayload) {
+    const meta = this.verifyRole('mobile');
     if (!meta) return;
-    socket.to(meta.sessionId).emit(Events.TERMINAL_RESIZE, payload);
+    this.ctx.to(meta.sessionId).emit(Events.TERMINAL_RESIZE, payload);
   }
 
   // ── Keepalive ───────────────────────────────────────────────────────────────
 
   @OnWSMessage(Events.SESSION_PING)
-  async onPing(socket: Socket, payload: SessionPingPayload) {
-    const meta = socketMeta.get(socket.id);
+  async onPing(payload: SessionPingPayload) {
+    const meta = socketMeta.get(this.ctx.id);
     if (!meta) return;
     await this.sessionService.touchActivity(meta.sessionId);
-    socket.emit(Events.SESSION_PING, { ...payload, timestamp: Date.now() });
+    this.ctx.emit(Events.SESSION_PING, { ...payload, timestamp: Date.now() });
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
-  private verifyRole(socket: Socket, expectedRole: 'agent' | 'mobile'): SocketMeta | null {
-    const meta = socketMeta.get(socket.id);
+  private verifyRole(expectedRole: 'agent' | 'mobile'): SocketMeta | null {
+    const meta = socketMeta.get(this.ctx.id);
     if (!meta || meta.role !== expectedRole) {
-      this.sendError(socket, SessionErrorCode.UNAUTHORIZED_EVENT, `Only ${expectedRole} can emit this event`);
+      this.sendError(SessionErrorCode.UNAUTHORIZED_EVENT, `Only ${expectedRole} can emit this event`);
       return null;
     }
     return meta;
@@ -235,9 +241,9 @@ export class RelayController {
     return Buffer.byteLength(data, 'utf8') <= MAX_PAYLOAD_BYTES;
   }
 
-  private sendError(socket: Socket, code: SessionErrorCode, message: string) {
+  private sendError(code: SessionErrorCode, message: string) {
     const payload: SessionErrorPayload = { code, message };
-    socket.emit(Events.SESSION_ERROR, payload);
+    this.ctx.emit(Events.SESSION_ERROR, payload);
   }
 
   private broadcastState(sessionId: string, session: {

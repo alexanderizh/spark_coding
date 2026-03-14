@@ -4,7 +4,8 @@
       "Bash(yarn workspace:*)",
       "Bash(node:*)",
       "Bash(python3:*)",
-      "Bash(yarn add:*)"
+      "Bash(yarn add:*)",
+      "Bash(ls:*)"
     ]
   }
 }

@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/session_service.dart';
 import '../services/socket_service.dart';
+import '../utils/app_logger.dart';
 
 // ---------------------------------------------------------------------------
 // Service providers (singleton instances shared across the app)
@@ -27,12 +27,7 @@ final sessionServiceProvider = Provider<SessionService>((ref) {
 // Connection status enum
 // ---------------------------------------------------------------------------
 
-enum ConnectionStatus {
-  disconnected,
-  connecting,
-  connected,
-  error,
-}
+enum ConnectionStatus { disconnected, connecting, connected, error }
 
 // ---------------------------------------------------------------------------
 // Connection state
@@ -84,9 +79,9 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
   ConnectionNotifier({
     required SocketService socketService,
     required SessionService sessionService,
-  })  : _socketService = socketService,
-        _sessionService = sessionService,
-        super(const AppConnectionState()) {
+  }) : _socketService = socketService,
+       _sessionService = sessionService,
+       super(const AppConnectionState()) {
     _listenToSocketStatus();
   }
 
@@ -97,18 +92,29 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
 
   void _listenToSocketStatus() {
     _statusSub = _socketService.connectionStatus.listen((socketStatus) {
+      AppLogger.info(
+        'Connection',
+        'Socket 状态变更: $socketStatus, serverUrl: ${state.serverUrl}',
+      );
       switch (socketStatus) {
         case SocketConnectionStatus.connected:
+          AppLogger.info('Connection', '已连接到中继服务器');
           state = state.copyWith(status: ConnectionStatus.connected);
         case SocketConnectionStatus.disconnected:
+          AppLogger.warn('Connection', '已断开连接');
           // Only move to disconnected if we were previously connected or
           // connecting. Avoids spurious state flips on startup.
           if (state.status != ConnectionStatus.disconnected) {
             state = state.copyWith(status: ConnectionStatus.disconnected);
           }
         case SocketConnectionStatus.reconnecting:
+          AppLogger.info('Connection', '正在重连...');
           state = state.copyWith(status: ConnectionStatus.connecting);
         case SocketConnectionStatus.error:
+          AppLogger.error(
+            'Connection',
+            '连接错误，当前 errorMessage: ${state.errorMessage}',
+          );
           state = state.copyWith(
             status: ConnectionStatus.error,
             errorMessage: 'Connection error. Retrying…',
@@ -123,8 +129,14 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
     required String token,
     required String sessionId,
   }) async {
+    AppLogger.info(
+      'Connection',
+      'connect 调用 — serverUrl: $serverUrl, sessionId: $sessionId',
+    );
+
     if (state.status == ConnectionStatus.connecting ||
         state.status == ConnectionStatus.connected) {
+      AppLogger.warn('Connection', '已在连接/已连接，跳过');
       return;
     }
 
@@ -134,8 +146,11 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
     );
 
     try {
+      AppLogger.info('Connection', '正在生成 deviceId...');
       final deviceId = await _sessionService.generateDeviceId();
+      AppLogger.info('Connection', 'deviceId 已生成: $deviceId');
 
+      AppLogger.info('Connection', '正在调用 SocketService.connect...');
       await _socketService.connect(
         serverUrl: serverUrl,
         token: token,
@@ -143,9 +158,13 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
         deviceId: deviceId,
       );
 
+      AppLogger.info(
+        'Connection',
+        'SocketService.connect 已返回（连接为异步，状态由 listener 更新）',
+      );
       // The status will be updated by the socket status listener.
     } catch (e, st) {
-      debugPrint('[ConnectionNotifier] connect error: $e\n$st');
+      AppLogger.error('Connection', 'connect 异常', e, st);
       state = AppConnectionState(
         status: ConnectionStatus.error,
         errorMessage: e.toString(),
@@ -173,11 +192,11 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
 
 final connectionNotifierProvider =
     StateNotifierProvider<ConnectionNotifier, AppConnectionState>((ref) {
-  return ConnectionNotifier(
-    socketService: ref.watch(socketServiceProvider),
-    sessionService: ref.watch(sessionServiceProvider),
-  );
-});
+      return ConnectionNotifier(
+        socketService: ref.watch(socketServiceProvider),
+        sessionService: ref.watch(sessionServiceProvider),
+      );
+    });
 
 /// Convenience provider that exposes only the [ConnectionStatus] enum value
 /// for use in the router redirect logic.

@@ -1,0 +1,15 @@
+{
+  "keep": {
+    "days": true,
+    "amount": 7
+  },
+  "auditLog": "/Users/zhangyang/spark_ai_project/spark_coding/apps/server/logs/@remote-claude/server/.audit/.f8172a9d544381aad243f0427203073fb23720b0-audit.json",
+  "files": [
+    {
+      "date": 1773486936321,
+      "name": "/Users/zhangyang/spark_ai_project/spark_coding/apps/server/logs/@remote-claude/server/midway-core.log.2026-03-14",
+      "hash": "526f3d54928100db9dc3d5890016730e"
+    }
+  ],
+  "hashType": "md5"
+}

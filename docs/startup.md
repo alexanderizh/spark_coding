@@ -182,6 +182,15 @@ Flutter 运行期间在终端按 `r` 热重载，`R` 热重启，`q` 退出。
 
 ## 常见问题
 
+**Q: mobile 连接成功后报 `posix_spawnp failed`**
+
+Claude CLI 可执行文件未找到或无法启动。终端代理会尝试通过 `which` 解析 `claude` 为绝对路径。若仍失败，请显式指定路径：
+```bash
+yarn dev:terminal -- --claude-path /Users/你的用户名/.local/bin/claude
+# 或设置环境变量
+CLAUDE_PATH=/path/to/claude yarn dev:terminal
+```
+
 **Q: `yarn dev:terminal` 提示 node-pty 编译失败**
 
 macOS 需要 Xcode Command Line Tools：

@@ -48,3 +48,51 @@
     at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
     at /Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
     at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/apark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 19:15:46.346 ERROR 39176 TypeError: socket.emit is not a function
+    at RelayController.sendError (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:240:12)
+    at RelayController.verifyRole (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:218:12)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:112:23)
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:148:89
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 19:17:17.735 ERROR 39176 TypeError: socket.emit is not a function
+    at RelayController.sendError (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:240:12)
+    at RelayController.verifyRole (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:218:12)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:112:23)
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:148:89
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 19:19:42.139 ERROR 44947 TypeError: this.app.to is not a function
+    at RelayController.broadcastState (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:261:14)
+    at RelayController.onAgentRegister (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:135:23)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:151:44
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:273:40
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/baseFramework.js:267:24
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:134:48)
+2026-03-14 19:22:47.066 ERROR 44947 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:45:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 19:25:37.554 ERROR 53652 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:45:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
