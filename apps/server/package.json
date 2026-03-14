@@ -1,7 +1,7 @@
 {
-  "name": "@remote-claude/server",
+  "name": "@spark_coder/server",
   "version": "1.0.0",
-  "description": "MidwayJS relay server for remote-claude",
+  "description": "MidwayJS relay server for spark_coder",
   "scripts": {
     "dev": "cross-env NODE_ENV=local ts-node-dev --project tsconfig.json src/bootstrap.ts",
     "build": "tsc",
@@ -19,7 +19,7 @@
     "@midwayjs/socketio": "^3.17.0",
     "@midwayjs/typeorm": "^3.17.0",
     "@midwayjs/validate": "^3.17.0",
-    "@remote-claude/shared": "^1.0.0",
+    "@spark_coder/shared": "^1.0.0",
     "koa-body": "^6.0.1",
     "koa-router": "^12.0.1",
     "mysql2": "^3.19.1",

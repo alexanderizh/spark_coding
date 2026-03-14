@@ -1,9 +1,6 @@
 import { defineConfig } from '@umijs/max';
 
 export default defineConfig({
-  devServer: {
-    port: 5174,
-  },
   antd: {
     configProvider: {},
     style: 'less',

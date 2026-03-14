@@ -30,34 +30,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
-        pageBuilder: (context, state) => _buildPage(
-          state: state,
-          child: const HomeScreen(),
-        ),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const HomeScreen()),
       ),
       GoRoute(
         path: AppRoutes.scan,
         name: 'scan',
-        pageBuilder: (context, state) => _buildPage(
-          state: state,
-          child: const ScannerScreen(),
-        ),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const ScannerScreen()),
       ),
       GoRoute(
         path: AppRoutes.terminal,
         name: 'terminal',
-        pageBuilder: (context, state) => _buildPage(
-          state: state,
-          child: const TerminalScreen(),
-        ),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const TerminalScreen()),
       ),
       GoRoute(
         path: AppRoutes.settings,
         name: 'settings',
-        pageBuilder: (context, state) => _buildPage(
-          state: state,
-          child: const SettingsScreen(),
-        ),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const SettingsScreen()),
       ),
     ],
     redirect: (context, state) {
@@ -68,7 +60,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // If user is navigating to terminal but there is no active session,
       // redirect to home so they can scan a new QR code.
       if (currentPath == AppRoutes.terminal) {
-        final isConnected = connectionState == ConnectionStatus.connected ||
+        final isConnected =
+            connectionState == ConnectionStatus.connected ||
             connectionState == ConnectionStatus.connecting;
         final hasSession = sessionState != null;
 
@@ -93,8 +86,8 @@ CustomTransitionPage<void> _buildPage({
   required GoRouterState state,
   required Widget child,
 }) {
-  final isModal = state.uri.path == AppRoutes.scan ||
-      state.uri.path == AppRoutes.settings;
+  final isModal =
+      state.uri.path == AppRoutes.scan || state.uri.path == AppRoutes.settings;
 
   if (isModal) {
     return CustomTransitionPage<void>(
@@ -103,13 +96,10 @@ CustomTransitionPage<void> _buildPage({
       transitionDuration: const Duration(milliseconds: 300),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          )),
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+              .animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
           child: child,
         );
       },
@@ -154,7 +144,11 @@ class _ErrorPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Color(0xFFFF5252), size: 48),
+              const Icon(
+                Icons.error_outline,
+                color: Color(0xFFFF5252),
+                size: 48,
+              ),
               const SizedBox(height: 16),
               Text(
                 error,

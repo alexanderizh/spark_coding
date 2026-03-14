@@ -119,5 +119,5 @@ apps/mobile/lib/widgets/terminal_view.dart
 
 1. Socket.IO 事件名（`Events` 常量）
 2. 各事件 Payload 结构
-3. QR 码 URL 格式：`remoteclaude://pair?token=TOKEN&server=SERVER_URL`
+3. QR 码 URL 格式：`sparkcoder://pair?token=TOKEN&server=SERVER_URL`
 4. REST 接口路径与响应格式：`POST /api/session`、`GET /api/session/:token`

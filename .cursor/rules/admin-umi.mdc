@@ -16,3 +16,8 @@ alwaysApply: false
 
 - `yarn dev:admin` 启动开发服务（端口 5174）
 - API 代理到 `http://localhost:7001`，需先启动 server
+
+## 配置注意事项
+
+- **Umi Max 项目**：必须使用 `max` 命令（如 `max setup`、`max dev`、`max build`），不能使用 `umi`，否则会报 `Invalid config keys: devServer, antd` 错误
+- **端口配置**：Umi 4 不支持 `devServer.port`，需通过 `cross-env PORT=5174` 在 dev 脚本中设置

@@ -15,21 +15,18 @@ void main() {
     DeviceOrientation.landscapeRight,
   ]);
 
-  // Dark system UI overlay for terminal aesthetic
+  // Light system UI overlay for minimalist aesthetic
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0D0D0D),
-      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness:
+          Brightness.dark, // Dark icons for white background
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
 
-  runApp(
-    const ProviderScope(
-      child: RemoteClaudeApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: RemoteClaudeApp()));
 }
 
 class RemoteClaudeApp extends ConsumerWidget {
@@ -42,145 +39,122 @@ class RemoteClaudeApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Remote Claude',
       debugShowCheckedModeBanner: false,
-      theme: _buildDarkTerminalTheme(),
+      theme: _buildMinimalistTheme(),
       routerConfig: router,
     );
   }
 
-  ThemeData _buildDarkTerminalTheme() {
-    const backgroundColor = Color(0xFF0D0D0D);
-    const surfaceColor = Color(0xFF1A1A1A);
-    const primaryColor = Color(0xFF00FF41); // Matrix green
-    const onPrimaryColor = Color(0xFF000000);
-    const onSurfaceColor = Color(0xFFE0E0E0);
-    const errorColor = Color(0xFFFF5252);
+  ThemeData _buildMinimalistTheme() {
+    const backgroundColor = Colors.white;
+    const surfaceColor = Color(0xFFFAFAFA);
+    const primaryColor = Colors.black;
+    const onPrimaryColor = Colors.white;
+    const onSurfaceColor = Colors.black;
+    const secondaryColor = Color(0xFF808080);
+    const errorColor = Color(0xFFD32F2F);
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: Brightness.light,
       scaffoldBackgroundColor: backgroundColor,
-      colorScheme: const ColorScheme.dark(
+      colorScheme: const ColorScheme.light(
         primary: primaryColor,
         onPrimary: onPrimaryColor,
-        secondary: Color(0xFF00CC33),
-        onSecondary: onPrimaryColor,
+        secondary: secondaryColor,
+        onSecondary: Colors.white,
         surface: surfaceColor,
         onSurface: onSurfaceColor,
         error: errorColor,
         onError: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF111111),
+        backgroundColor: Colors.white,
         foregroundColor: onSurfaceColor,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
           color: primaryColor,
-          letterSpacing: 1.2,
         ),
         iconTheme: IconThemeData(color: onSurfaceColor),
       ),
       textTheme: const TextTheme(
-        bodyLarge: TextStyle(
-          fontFamily: 'monospace',
-          color: onSurfaceColor,
-        ),
-        bodyMedium: TextStyle(
-          fontFamily: 'monospace',
-          color: onSurfaceColor,
-        ),
-        bodySmall: TextStyle(
-          fontFamily: 'monospace',
-          color: Color(0xFF9E9E9E),
-        ),
+        bodyLarge: TextStyle(color: onSurfaceColor, fontSize: 16),
+        bodyMedium: TextStyle(color: onSurfaceColor, fontSize: 14),
+        bodySmall: TextStyle(color: secondaryColor, fontSize: 12),
         titleLarge: TextStyle(
-          fontFamily: 'monospace',
           color: primaryColor,
           fontWeight: FontWeight.bold,
-          letterSpacing: 1.5,
+          fontSize: 22,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: onPrimaryColor,
-          textStyle: const TextStyle(
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          elevation: 0,
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryColor,
-          side: const BorderSide(color: Color(0xFF00FF41), width: 1),
-          textStyle: const TextStyle(
-            fontFamily: 'monospace',
-            letterSpacing: 1.0,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          side: const BorderSide(color: Colors.black, width: 1),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceColor,
+        fillColor: const Color(0xFFF5F5F5),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: const BorderSide(color: Color(0xFF333333)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: const BorderSide(color: Color(0xFF333333)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: primaryColor, width: 1.5),
         ),
-        labelStyle: const TextStyle(color: Color(0xFF9E9E9E), fontFamily: 'monospace'),
-        hintStyle: const TextStyle(color: Color(0xFF555555), fontFamily: 'monospace'),
-        prefixStyle: const TextStyle(color: onSurfaceColor, fontFamily: 'monospace'),
-      ),
-      cardTheme: CardThemeData(
-        color: surfaceColor,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-          side: const BorderSide(color: Color(0xFF2A2A2A)),
+        labelStyle: const TextStyle(color: secondaryColor),
+        hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
+        prefixStyle: const TextStyle(color: onSurfaceColor),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
         ),
       ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 2,
+        shadowColor: Colors.black12,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
       dividerTheme: const DividerThemeData(
-        color: Color(0xFF2A2A2A),
+        color: Color(0xFFEEEEEE),
         thickness: 1,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFF2A2A2A),
-        selectedColor: const Color(0xFF003300),
-        labelStyle: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 12,
-          color: onSurfaceColor,
-        ),
-        side: const BorderSide(color: Color(0xFF404040)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        backgroundColor: const Color(0xFFF0F0F0),
+        selectedColor: Colors.black,
+        labelStyle: const TextStyle(fontSize: 12, color: onSurfaceColor),
+        secondaryLabelStyle: const TextStyle(fontSize: 12, color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        side: BorderSide.none,
       ),
       snackBarTheme: const SnackBarThemeData(
-        backgroundColor: Color(0xFF1E1E1E),
-        contentTextStyle: TextStyle(
-          fontFamily: 'monospace',
-          color: onSurfaceColor,
-        ),
+        backgroundColor: Color(0xFF333333),
+        contentTextStyle: TextStyle(color: Colors.white),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(4)),
+          borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
         behavior: SnackBarBehavior.floating,
       ),

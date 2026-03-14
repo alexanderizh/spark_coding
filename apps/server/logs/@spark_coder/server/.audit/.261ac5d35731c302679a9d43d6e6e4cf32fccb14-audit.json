@@ -1,0 +1,15 @@
+{
+  "keep": {
+    "days": true,
+    "amount": 7
+  },
+  "auditLog": "/Users/zhangyang/spark_ai_project/spark_coding/apps/server/logs/@spark_coder/server/.audit/.261ac5d35731c302679a9d43d6e6e4cf32fccb14-audit.json",
+  "files": [
+    {
+      "date": 1773489792815,
+      "name": "/Users/zhangyang/spark_ai_project/spark_coding/apps/server/logs/@spark_coder/server/common-error.log.2026-03-14",
+      "hash": "888a4099e190c3f4b7e5c65d3a23d592"
+    }
+  ],
+  "hashType": "md5"
+}

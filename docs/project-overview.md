@@ -8,7 +8,7 @@
 
 ### 解决方案
 
-remote-claude 将主机上运行的 Claude CLI 的输入输出通过加密 WebSocket 通道同步到手机，让开发者能在任何地方：
+spark_coder 将主机上运行的 Claude CLI 的输入输出通过加密 WebSocket 通道同步到手机，让开发者能在任何地方：
 - 查看 Claude 的实时输出
 - 发送指令、回答提示
 - 处理权限请求（y/n 按钮一键响应）
@@ -23,7 +23,7 @@ remote-claude 将主机上运行的 Claude CLI 的输入输出通过加密 WebSo
 ┌─────────────────────────────────────────────────────────────────────┐
 │                           主机 (terminal)                            │
 │                                                                     │
-│   remote-claude start                                               │
+│   spark start                                                       │
 │         │                                                           │
 │   创建会话 → 获取 token → 显示二维码                                   │
 │         │                                                           │
@@ -55,7 +55,7 @@ remote-claude 将主机上运行的 Claude CLI 的输入输出通过加密 WebSo
 ┌────────────────────────────▼────────────────────────────────────────┐
 │                        手机端 (mobile)                               │
 │                                                                     │
-│   扫描二维码 → 解析 remoteclaude://pair?token=T&server=S             │
+│   扫描二维码 → 解析 sparkcoder://pair?token=T&server=S             │
 │         │                                                           │
 │   Socket.IO 连接 (role: mobile) → emit mobile:join                  │
 │         │                                                           │

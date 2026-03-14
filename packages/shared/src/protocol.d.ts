@@ -63,7 +63,7 @@ export interface SessionPingPayload {
     sessionId: string;
     timestamp: number;
 }
-export declare const QR_SCHEME = "remoteclaude";
+export declare const QR_SCHEME = "sparkcoder";
 export declare function buildPairUrl(serverUrl: string, token: string): string;
 export declare function parsePairUrl(url: string): {
     token: string;

@@ -15,7 +15,7 @@ alwaysApply: false
 
 - `config.keys` 为必填项（Koa cookie 签名），可在 `config.default.ts` 中配置：
   ```ts
-  keys: process.env.APP_KEYS?.split(',') ?? ['remote-claude-default-key']
+  keys: process.env.APP_KEYS?.split(',') ?? ['spark-coder-default-key']
   ```
 
 ## Socket.IO 控制器

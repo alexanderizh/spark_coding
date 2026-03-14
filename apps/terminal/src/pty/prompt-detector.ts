@@ -1,4 +1,4 @@
-import { CLAUDE_PROMPT_PATTERNS, ClaudePromptType } from '@remote-claude/shared';
+import { CLAUDE_PROMPT_PATTERNS, ClaudePromptType } from '@spark_coder/shared';
 
 const ROLLING_BUFFER_SIZE = 2048;
 const DEBOUNCE_MS = 100;

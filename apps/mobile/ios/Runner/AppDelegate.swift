@@ -11,7 +11,7 @@ import Flutter
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
-    // Handle remoteclaude:// deep links opened when the app is already running.
+    // Handle sparkcoder:// deep links opened when the app is already running.
     override func application(
         _ app: UIApplication,
         open url: URL,

@@ -8,7 +8,6 @@ import '../app/router.dart';
 import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
-import '../services/session_service.dart';
 import '../utils/app_logger.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
@@ -83,8 +82,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       if (parsed == null) {
         AppLogger.warn('Scanner', '二维码格式无效', rawValue);
         _showError(
-          'Invalid QR code. Expected format:\n'
-          'remoteclaude://pair?token=…&server=…',
+          '二维码无效。预期格式：\n'
+          'sparkcoder://pair?token=…&server=…',
         );
         return;
       }
@@ -124,14 +123,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
       if (!mounted) return;
       AppLogger.info('Scanner', '连接成功，跳转到终端页');
-      context.go(AppRoutes.terminal);
+      context.pushReplacement(AppRoutes.terminal);
     } catch (e, st) {
       AppLogger.error('Scanner', '处理二维码失败', e, st);
-      _showError('Failed to process QR code: $e');
+      _showError('处理二维码失败: $e');
     }
   }
 
-  /// Parses a `remoteclaude://pair?token=TOKEN&server=SERVER_URL&session=ID`
+  /// Parses a `sparkcoder://pair?token=TOKEN&server=SERVER_URL&session=ID`
   /// URL and returns a (token, serverUrl, sessionId) tuple, or null if the URL
   /// is not in the expected format.
   ///
@@ -141,10 +140,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     try {
       final uri = Uri.parse(raw);
 
-      if (uri.scheme != 'remoteclaude') {
+      if (uri.scheme != 'sparkcoder') {
         AppLogger.warn(
           'Scanner',
-          '解析失败: scheme 不是 remoteclaude',
+          '解析失败: scheme 不是 sparkcoder',
           'scheme=${uri.scheme}',
         );
         return null;
@@ -232,7 +231,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                  onPressed: () => context.go(AppRoutes.home),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go(AppRoutes.home);
+                    }
+                  },
                 ),
                 const Spacer(),
                 if (_hasPermission)
@@ -266,7 +271,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             const Padding(
               padding: EdgeInsets.only(bottom: 40),
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             )
           else
@@ -279,16 +284,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   Widget _buildScanFrame() {
     const frameSize = 260.0;
     const cornerLength = 32.0;
-    const cornerThickness = 3.0;
-    const cornerColor = Color(0xFF00FF41);
+    const cornerThickness = 4.0;
+    const cornerColor = Colors.white; // Minimalist white corners
 
     return SizedBox(
       width: frameSize,
       height: frameSize,
       child: Stack(
         children: [
-          // Semi-transparent background outside the frame is handled by the
-          // MobileScanner overlay. Here we just draw the corner accents.
           _corner(
             cornerColor,
             cornerLength,
@@ -364,26 +367,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   Widget _buildInstructions() {
     return Column(
       children: [
-        const Icon(Icons.qr_code, color: Colors.white54, size: 32),
+        const Icon(Icons.qr_code, color: Colors.white70, size: 32),
         const SizedBox(height: 12),
         const Text(
-          'Point your camera at the QR code\ndisplayed in your terminal',
-          style: TextStyle(
-            color: Colors.white70,
-            fontFamily: 'monospace',
-            fontSize: 13,
-            height: 1.5,
-          ),
+          '请将相机对准终端上显示的二维码',
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          'remoteclaude://pair?token=…',
-          style: TextStyle(
-            color: Colors.white.withAlpha(77),
-            fontFamily: 'monospace',
-            fontSize: 11,
-          ),
+          'sparkcoder://pair?token=…',
+          style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 12),
         ),
       ],
     );
@@ -393,9 +387,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0x88FF5252),
+        color: const Color(0xFFD32F2F),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFF5252)),
       ),
       child: Row(
         children: [
@@ -406,8 +399,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               _errorMessage!,
               style: const TextStyle(
                 color: Colors.white,
-                fontFamily: 'monospace',
-                fontSize: 12,
+                fontSize: 13,
                 height: 1.4,
               ),
             ),
@@ -425,7 +417,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   Widget _buildPermissionView() {
     return Container(
-      color: const Color(0xFF0D0D0D),
+      color: Colors.white, // White background for permission view
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(40),
@@ -435,17 +427,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               const Icon(
                 Icons.camera_alt_outlined,
                 size: 64,
-                color: Color(0xFF9E9E9E),
+                color: Colors.grey,
               ),
               const SizedBox(height: 24),
               Text(
-                _permissionDenied
-                    ? 'Camera permission denied.\nPlease enable it in Settings.'
-                    : 'Camera permission required\nto scan QR codes.',
+                _permissionDenied ? '相机权限被拒绝。\n请在设置中启用。' : '扫描二维码需要相机权限。',
                 style: const TextStyle(
-                  color: Color(0xFF9E9E9E),
-                  fontFamily: 'monospace',
-                  fontSize: 13,
+                  color: Colors.black87,
+                  fontSize: 14,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -454,12 +443,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               if (_permissionDenied)
                 OutlinedButton(
                   onPressed: openAppSettings,
-                  child: const Text('Open Settings'),
+                  child: const Text('打开设置'),
                 )
               else
                 ElevatedButton(
                   onPressed: _requestCameraPermission,
-                  child: const Text('Grant Permission'),
+                  child: const Text('授予权限'),
                 ),
             ],
           ),
@@ -492,7 +481,8 @@ class _CornerPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..strokeWidth = thickness
-      ..strokeCap = StrokeCap.square
+      ..strokeCap = StrokeCap
+          .round // Rounded corners for minimalist look
       ..style = PaintingStyle.stroke;
 
     final w = size.width;

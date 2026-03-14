@@ -1,4 +1,12 @@
+import path from 'path';
+import { config as loadDotenv } from 'dotenv';
 import { program } from 'commander';
+
+// 开发用 .env，打包/生产用 .prod.env
+const isProd = process.env.NODE_ENV === 'production';
+const envFile = isProd ? '.prod.env' : '.env';
+const envPath = path.resolve(__dirname, '../..', envFile);
+loadDotenv({ path: envPath });
 
 export interface AgentConfig {
   serverUrl: string;
@@ -10,7 +18,7 @@ export interface AgentConfig {
 
 export function loadConfig(): AgentConfig {
   program
-    .name('remote-claude')
+    .name('spark')
     .description('Remote Claude CLI controller — exposes Claude to your mobile via QR pairing')
     .option('-s, --server-url <url>', 'Relay server URL', process.env.REMOTE_CLAUDE_SERVER ?? 'http://localhost:7001')
     .option('-c, --claude-path <path>', 'Path to claude executable', process.env.CLAUDE_PATH ?? 'claude')

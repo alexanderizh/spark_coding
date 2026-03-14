@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,7 +7,6 @@ import '../app/router.dart';
 import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
-import '../services/session_service.dart';
 import '../utils/app_logger.dart';
 import '../widgets/connection_badge.dart';
 
@@ -20,6 +20,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isRestoring = true;
   bool _hasSavedSession = false;
+  DateTime? _lastBackPressTime;
 
   @override
   void initState() {
@@ -47,7 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (serverUrl == null || token == null || sessionId == null) {
       AppLogger.warn('HomeScreen', '无已保存会话', 'serverUrl=$serverUrl');
-      _showError('No saved session found. Please scan a QR code.');
+      _showError('未找到保存的会话，请扫描二维码。');
       return;
     }
 
@@ -70,17 +71,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (!mounted) return;
     AppLogger.info('HomeScreen', '重连请求已发送，跳转到终端');
-    context.go(AppRoutes.terminal);
+    context.push(AppRoutes.terminal);
   }
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF2A2A2A),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -88,22 +86,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final connectionStatus = ref.watch(connectionProvider);
     final session = ref.watch(sessionProvider);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              _buildHeader(context),
-              const SizedBox(height: 48),
-              _buildStatusSection(connectionStatus, session?.serverUrl),
-              const Spacer(),
-              _buildActions(context, connectionStatus),
-              const SizedBox(height: 48),
-              _buildFooter(context),
-              const SizedBox(height: 24),
-            ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('再按一次退出应用'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              children: [
+                const SizedBox(height: 80),
+                _buildHeader(context),
+                const SizedBox(height: 48),
+                _buildStatusSection(connectionStatus, session?.serverUrl),
+                const Spacer(),
+                _buildActions(context, connectionStatus),
+                const SizedBox(height: 48),
+                _buildFooter(context),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -118,24 +136,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF00FF41), width: 2),
-            borderRadius: BorderRadius.circular(8),
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: const Icon(Icons.terminal, size: 48, color: Color(0xFF00FF41)),
+          child: const Icon(Icons.terminal, size: 48, color: Colors.black),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         Text(
-          'REMOTE CLAUDE',
+          '远程终端',
           style: Theme.of(
             context,
-          ).textTheme.titleLarge?.copyWith(fontSize: 22, letterSpacing: 4),
+          ).textTheme.titleLarge?.copyWith(fontSize: 24, letterSpacing: 1.2),
         ),
         const SizedBox(height: 8),
         Text(
-          'Mobile terminal controller',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(letterSpacing: 1.5),
+          '移动端控制器',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14),
         ),
       ],
     );
@@ -170,9 +186,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         // Primary action: scan QR
         ElevatedButton.icon(
-          onPressed: isConnecting ? null : () => context.go(AppRoutes.scan),
+          onPressed: isConnecting ? null : () => context.push(AppRoutes.scan),
           icon: const Icon(Icons.qr_code_scanner, size: 20),
-          label: const Text('SCAN QR CODE'),
+          label: const Text('扫描二维码'),
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
@@ -182,9 +198,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // If already connected, jump straight to terminal.
         if (isConnected)
           OutlinedButton.icon(
-            onPressed: () => context.go(AppRoutes.terminal),
+            onPressed: () => context.push(AppRoutes.terminal),
             icon: const Icon(Icons.open_in_new, size: 18),
-            label: const Text('OPEN TERMINAL'),
+            label: const Text('打开终端'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
@@ -196,14 +212,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           OutlinedButton.icon(
             onPressed: _reconnectLastSession,
             icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('RECONNECT LAST SESSION'),
+            label: const Text('重连上次会话'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
 
         if (isConnecting) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -212,14 +228,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                'Connecting...',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              Text('连接中...', style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ],
@@ -232,17 +245,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         TextButton.icon(
-          onPressed: () => context.go(AppRoutes.settings),
+          onPressed: () => context.push(AppRoutes.settings),
           icon: const Icon(Icons.settings, size: 16),
-          label: const Text('Settings'),
-          style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF9E9E9E),
-            textStyle: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              letterSpacing: 1.0,
-            ),
-          ),
+          label: const Text('设置'),
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFF9E9E9E)),
         ),
       ],
     );

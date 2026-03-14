@@ -13,8 +13,8 @@ import 'connection_provider.dart';
 
 class SessionNotifier extends StateNotifier<SessionModel?> {
   SessionNotifier({required SocketService socketService})
-      : _socketService = socketService,
-        super(null) {
+    : _socketService = socketService,
+      super(null) {
     _listenToEvents();
   }
 
@@ -23,17 +23,23 @@ class SessionNotifier extends StateNotifier<SessionModel?> {
   StreamSubscription<SessionPair>? _pairSub;
 
   void _listenToEvents() {
-    _stateSub = _socketService.sessionStates.listen((event) {
-      _onSessionState(event);
-    }, onError: (Object e) {
-      debugPrint('[SessionNotifier] sessionStates error: $e');
-    });
+    _stateSub = _socketService.sessionStates.listen(
+      (event) {
+        _onSessionState(event);
+      },
+      onError: (Object e) {
+        debugPrint('[SessionNotifier] sessionStates error: $e');
+      },
+    );
 
-    _pairSub = _socketService.sessionPairs.listen((pair) {
-      _onSessionPair(pair);
-    }, onError: (Object e) {
-      debugPrint('[SessionNotifier] sessionPairs error: $e');
-    });
+    _pairSub = _socketService.sessionPairs.listen(
+      (pair) {
+        _onSessionPair(pair);
+      },
+      onError: (Object e) {
+        debugPrint('[SessionNotifier] sessionPairs error: $e');
+      },
+    );
   }
 
   void _onSessionState(SessionStateEvent event) {
@@ -107,9 +113,9 @@ class SessionNotifier extends StateNotifier<SessionModel?> {
 
 final sessionNotifierProvider =
     StateNotifierProvider<SessionNotifier, SessionModel?>((ref) {
-  final socketService = ref.watch(socketServiceProvider);
-  return SessionNotifier(socketService: socketService);
-});
+      final socketService = ref.watch(socketServiceProvider);
+      return SessionNotifier(socketService: socketService);
+    });
 
 /// Convenience provider for the nullable [SessionModel].
 final sessionProvider = Provider<SessionModel?>((ref) {

@@ -3,7 +3,7 @@ import { Session } from '../entity/session.entity';
 
 export default {
   // Cookie signing keys (required by Midway Koa)
-  keys: process.env.APP_KEYS?.split(',') ?? ['remote-claude-default-key'],
+  keys: process.env.APP_KEYS?.split(',') ?? ['spark-coder-default-key'],
 
   // HTTP server
   koa: {

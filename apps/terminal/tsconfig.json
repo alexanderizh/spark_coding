@@ -4,7 +4,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "paths": {
-      "@remote-claude/shared": ["../../packages/shared/src"]
+      "@spark_coder/shared": ["../../packages/shared/src"]
     }
   },
   "include": ["src"]

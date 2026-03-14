@@ -1,5 +1,5 @@
 {
-  "name": "remote-claude",
+  "name": "spark_coder",
   "version": "1.0.0",
   "private": true,
   "description": "Remote control Claude CLI from mobile via QR-code pairing",
@@ -10,15 +10,16 @@
     "apps/admin"
   ],
   "scripts": {
-    "build:shared": "yarn workspace @remote-claude/shared build",
-    "build:server": "yarn workspace @remote-claude/server build",
-    "build:terminal": "yarn workspace @remote-claude/terminal build",
-    "dev:server": "yarn workspace @remote-claude/server dev",
-    "dev:terminal": "yarn workspace @remote-claude/terminal dev",
+    "postinstall": "node -e \"const fs=require('fs'),path=require('path');const p=path.join(process.cwd(),'node_modules/@spark_coder/shared');if(!fs.existsSync(p)){fs.mkdirSync(path.dirname(p),{recursive:true});fs.symlinkSync(path.join(process.cwd(),'packages/shared'),p,'dir');}\"",
+    "build:shared": "yarn workspace @spark_coder/shared build",
+    "build:server": "yarn workspace @spark_coder/server build",
+    "build:terminal": "yarn workspace @spark_coder/terminal build",
+    "dev:server": "yarn workspace @spark_coder/server dev",
+    "dev:terminal": "yarn workspace @spark_coder/terminal dev",
     "dev:admin": "yarn workspace admin dev",
     "build:admin": "yarn workspace admin build",
-    "start:server": "yarn workspace @remote-claude/server start",
-    "start:terminal": "yarn workspace @remote-claude/terminal start"
+    "start:server": "yarn workspace @spark_coder/server start",
+    "start:terminal": "yarn workspace @spark_coder/terminal start"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

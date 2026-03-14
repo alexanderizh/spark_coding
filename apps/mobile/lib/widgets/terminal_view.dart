@@ -12,10 +12,7 @@ typedef TerminalResizeCallback = void Function(int cols, int rows);
 ///   - Pinch-to-zoom to change font size.
 ///   - Dark terminal colour palette matching the app theme.
 class TerminalViewWidget extends ConsumerStatefulWidget {
-  const TerminalViewWidget({
-    super.key,
-    required this.onResize,
-  });
+  const TerminalViewWidget({super.key, required this.onResize});
 
   final TerminalResizeCallback onResize;
 
@@ -53,7 +50,10 @@ class _TerminalViewWidgetState extends ConsumerState<TerminalViewWidget> {
       },
       onScaleUpdate: (details) {
         if (details.pointerCount < 2) return;
-        final newSize = (_fontSizeAtScaleStart * details.scale).clamp(8.0, 24.0);
+        final newSize = (_fontSizeAtScaleStart * details.scale).clamp(
+          8.0,
+          24.0,
+        );
         ref.read(terminalNotifierProvider.notifier).setFontSize(newSize);
       },
       child: LayoutBuilder(
@@ -61,10 +61,8 @@ class _TerminalViewWidgetState extends ConsumerState<TerminalViewWidget> {
           final availableWidth = constraints.maxWidth;
           final availableHeight = constraints.maxHeight;
 
-          final cols =
-              (availableWidth / _charWidth).floor().clamp(10, 500);
-          final rows =
-              (availableHeight / _charHeight).floor().clamp(5, 200);
+          final cols = (availableWidth / _charWidth).floor().clamp(10, 500);
+          final rows = (availableHeight / _charHeight).floor().clamp(5, 200);
 
           // Notify relay server only when the dimensions actually change.
           if (cols != _lastCols || rows != _lastRows) {
@@ -96,28 +94,28 @@ class _TerminalViewWidgetState extends ConsumerState<TerminalViewWidget> {
 
   TerminalTheme _buildTerminalTheme() {
     return const TerminalTheme(
-      cursor: Color(0xFF00FF41),
-      selection: Color(0x4400FF41),
+      cursor: Color(0xFFFFFFFF), // White cursor
+      selection: Color(0x44FFFFFF), // White selection
       foreground: Color(0xFFE0E0E0),
       background: Color(0xFF000000),
       black: Color(0xFF000000),
       red: Color(0xFFFF5252),
-      green: Color(0xFF00FF41),
-      yellow: Color(0xFFFFB300),
-      blue: Color(0xFF448AFF),
-      magenta: Color(0xFFEA80FC),
-      cyan: Color(0xFF18FFFF),
+      green: Color(0xFF4CAF50), // Less neon green
+      yellow: Color(0xFFFFEB3B),
+      blue: Color(0xFF2196F3),
+      magenta: Color(0xFFE040FB),
+      cyan: Color(0xFF00BCD4),
       white: Color(0xFFE0E0E0),
       brightBlack: Color(0xFF616161),
       brightRed: Color(0xFFFF8A80),
-      brightGreen: Color(0xFFCCFF90),
-      brightYellow: Color(0xFFFFE57F),
+      brightGreen: Color(0xFFB9F6CA),
+      brightYellow: Color(0xFFFFFF8D),
       brightBlue: Color(0xFF82B1FF),
       brightMagenta: Color(0xFFEA80FC),
       brightCyan: Color(0xFF84FFFF),
       brightWhite: Color(0xFFFFFFFF),
-      searchHitBackground: Color(0x6600FF41),
-      searchHitBackgroundCurrent: Color(0x9900FF41),
+      searchHitBackground: Color(0x66FFFFFF),
+      searchHitBackgroundCurrent: Color(0x99FFFFFF),
       searchHitForeground: Color(0xFF000000),
     );
   }

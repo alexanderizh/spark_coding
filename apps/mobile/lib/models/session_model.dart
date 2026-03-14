@@ -100,24 +100,24 @@ class SessionModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'sessionId': sessionId,
-        'token': token,
-        'serverUrl': serverUrl,
-        'state': state.value,
-        'agentConnected': agentConnected,
-        'mobileConnected': mobileConnected,
-        'pairedAt': pairedAt,
-      };
+    'sessionId': sessionId,
+    'token': token,
+    'serverUrl': serverUrl,
+    'state': state.value,
+    'agentConnected': agentConnected,
+    'mobileConnected': mobileConnected,
+    'pairedAt': pairedAt,
+  };
 
   factory SessionModel.fromJson(Map<String, dynamic> json) => SessionModel(
-        sessionId: json['sessionId'] as String,
-        token: json['token'] as String,
-        serverUrl: json['serverUrl'] as String,
-        state: SessionState.fromString(json['state'] as String? ?? 'unknown'),
-        agentConnected: json['agentConnected'] as bool? ?? false,
-        mobileConnected: json['mobileConnected'] as bool? ?? false,
-        pairedAt: json['pairedAt'] as int?,
-      );
+    sessionId: json['sessionId'] as String,
+    token: json['token'] as String,
+    serverUrl: json['serverUrl'] as String,
+    state: SessionState.fromString(json['state'] as String? ?? 'unknown'),
+    agentConnected: json['agentConnected'] as bool? ?? false,
+    mobileConnected: json['mobileConnected'] as bool? ?? false,
+    pairedAt: json['pairedAt'] as int?,
+  );
 
   @override
   bool operator ==(Object other) {
@@ -134,14 +134,14 @@ class SessionModel {
 
   @override
   int get hashCode => Object.hash(
-        sessionId,
-        token,
-        serverUrl,
-        state,
-        agentConnected,
-        mobileConnected,
-        pairedAt,
-      );
+    sessionId,
+    token,
+    serverUrl,
+    state,
+    agentConnected,
+    mobileConnected,
+    pairedAt,
+  );
 
   @override
   String toString() =>
@@ -163,27 +163,24 @@ class SessionPair {
   final int pairedAt;
 
   factory SessionPair.fromJson(Map<String, dynamic> json) => SessionPair(
-        sessionId: json['sessionId'] as String,
-        mobileDeviceId: json['mobileDeviceId'] as String,
-        pairedAt: json['pairedAt'] as int,
-      );
+    sessionId: json['sessionId'] as String,
+    mobileDeviceId: json['mobileDeviceId'] as String,
+    pairedAt: json['pairedAt'] as int,
+  );
 }
 
 /// Represents a session error event from the server.
 @immutable
 class SessionError {
-  const SessionError({
-    required this.code,
-    required this.message,
-  });
+  const SessionError({required this.code, required this.message});
 
   final String code;
   final String message;
 
   factory SessionError.fromJson(Map<String, dynamic> json) => SessionError(
-        code: json['code'] as String? ?? 'UNKNOWN',
-        message: json['message'] as String? ?? 'An unknown error occurred.',
-      );
+    code: json['code'] as String? ?? 'UNKNOWN',
+    message: json['message'] as String? ?? 'An unknown error occurred.',
+  );
 
   @override
   String toString() => 'SessionError(code: $code, message: $message)';
@@ -210,9 +207,9 @@ class TerminalOutput {
   final int seq;
 
   factory TerminalOutput.fromJson(Map<String, dynamic> json) => TerminalOutput(
-        sessionId: json['sessionId'] as String,
-        data: json['data'] as String,
-        timestamp: json['timestamp'] as int,
-        seq: json['seq'] as int,
-      );
+    sessionId: json['sessionId'] as String,
+    data: json['data'] as String,
+    timestamp: json['timestamp'] as int,
+    seq: json['seq'] as int,
+  );
 }

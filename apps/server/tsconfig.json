@@ -5,7 +5,7 @@
     "rootDir": "src",
     "strictPropertyInitialization": false,
     "paths": {
-      "@remote-claude/shared": ["../../packages/shared/src"]
+      "@spark_coder/shared": ["../../packages/shared/src"]
     }
   },
   "include": ["src"]

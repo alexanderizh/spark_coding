@@ -61,7 +61,7 @@
 	</dict>
 
 	<!-- ---------------------------------------------------------------
-	     Custom URL scheme: remoteclaude://pair?token=…&server=…
+	     Custom URL scheme: sparkcoder://pair?token=…&server=…
 	     Registered so the OS can route deep links to this app.
 	     --------------------------------------------------------------- -->
 	<key>CFBundleURLTypes</key>
@@ -73,7 +73,7 @@
 			<string>com.zhangyang.spark_coding</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>remoteclaude</string>
+				<string>sparkcoder</string>
 			</array>
 		</dict>
 	</dict>

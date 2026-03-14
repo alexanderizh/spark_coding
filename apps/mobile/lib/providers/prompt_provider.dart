@@ -13,8 +13,8 @@ import 'connection_provider.dart';
 
 class PromptNotifier extends StateNotifier<ClaudePrompt?> {
   PromptNotifier({required SocketService socketService})
-      : _socketService = socketService,
-        super(null) {
+    : _socketService = socketService,
+      super(null) {
     _listenToPrompts();
   }
 
@@ -26,11 +26,14 @@ class PromptNotifier extends StateNotifier<ClaudePrompt?> {
   static const _autoClearDuration = Duration(seconds: 60);
 
   void _listenToPrompts() {
-    _promptSub = _socketService.claudePrompts.listen((prompt) {
-      _onPrompt(prompt);
-    }, onError: (Object e) {
-      debugPrint('[PromptNotifier] claudePrompts error: $e');
-    });
+    _promptSub = _socketService.claudePrompts.listen(
+      (prompt) {
+        _onPrompt(prompt);
+      },
+      onError: (Object e) {
+        debugPrint('[PromptNotifier] claudePrompts error: $e');
+      },
+    );
   }
 
   void _onPrompt(ClaudePrompt prompt) {
@@ -69,9 +72,9 @@ class PromptNotifier extends StateNotifier<ClaudePrompt?> {
 
 final promptNotifierProvider =
     StateNotifierProvider<PromptNotifier, ClaudePrompt?>((ref) {
-  final socketService = ref.watch(socketServiceProvider);
-  return PromptNotifier(socketService: socketService);
-});
+      final socketService = ref.watch(socketServiceProvider);
+      return PromptNotifier(socketService: socketService);
+    });
 
 /// Convenience provider for the current nullable [ClaudePrompt].
 final currentPromptProvider = Provider<ClaudePrompt?>((ref) {

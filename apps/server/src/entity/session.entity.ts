@@ -2,7 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column,
   CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
-import { SessionState } from '@remote-claude/shared';
+import { SessionState } from '@spark_coder/shared';
 
 @Entity('sessions')
 export class Session {

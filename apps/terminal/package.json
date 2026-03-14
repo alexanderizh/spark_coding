@@ -1,22 +1,24 @@
 {
-  "name": "@remote-claude/terminal",
+  "name": "@spark_coder/terminal",
   "version": "1.0.0",
   "description": "Host terminal agent — spawns Claude CLI and relays I/O",
   "bin": {
-    "remote-claude": "./bin/remote-claude.js"
+    "spark": "./bin/spark.js"
   },
   "scripts": {
     "dev": "ts-node-dev --project tsconfig.json src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "cross-env NODE_ENV=production node dist/index.js"
   },
   "dependencies": {
-    "@remote-claude/shared": "^1.0.0",
+    "@spark_coder/shared": "^1.0.0",
+    "dotenv": "^16.4.5",
     "axios": "^1.6.8",
     "node-pty": "^1.0.0",
     "qrcode-terminal": "^0.12.0",
     "socket.io-client": "^4.7.5",
-    "commander": "^12.0.0"
+    "commander": "^12.0.0",
+    "cross-env": "^7.0.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

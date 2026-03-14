@@ -1,0 +1,47 @@
+---
+description: Terminal PTY 与 Claude CLI 启动规范
+globs: apps/terminal/**/*
+alwaysApply: false
+---
+
+# Terminal PTY 规范
+
+## node-pty 与 posix_spawnp 失败
+
+在 macOS 上 node-pty 报 `posix_spawnp failed`，最常见原因是：
+
+### 根本原因：spawn-helper 缺少执行权限
+
+yarn/npm 安装 node-pty prebuilt 时，`spawn-helper` 二进制的执行权限（`+x`）会丢失。
+node-pty 所有 spawn 操作都依赖该 helper，一旦它不可执行，**任何 pty.spawn() 都会失败**，与目标程序的路径无关。
+
+**修复**（安装后执行一次）：
+```bash
+chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper
+# 如果是 x64 机器：
+chmod +x node_modules/node-pty/prebuilds/darwin-x64/spawn-helper
+```
+
+### 路径问题
+
+node-pty 的 posix_spawnp 需要绝对路径，不会自动搜索 PATH。
+已通过 `resolveExecutablePath()` 分平台解析：
+- **Unix/macOS**：使用 `which`，如 `claude` → `/Users/zhangyang/.local/bin/claude`
+- **Windows**：使用 `where`，如 `claude` → `C:\...\claude.exe`
+
+参考：node-pty issues #670、#789。
+
+## 配置
+
+- 开发：`apps/terminal/.env`（复制 `.env.example`）
+- 打包/生产：`apps/terminal/.prod.env`（复制 `.prod.env.example`）
+
+CLI 参数 `--server-url` 可临时覆盖。
+
+## 命令
+
+打包发布到 npm 后，用户通过 `npm install -g @spark_coder/terminal` 安装，可直接用 `spark` 命令启动。
+
+## 模块解析
+
+若 `yarn dev:terminal` 报 `Cannot find module '@spark_coder/shared'`，先执行 `yarn install`（postinstall 会创建符号链接）；若仍失败，可执行 `rm -rf node_modules yarn.lock && yarn install` 重建。

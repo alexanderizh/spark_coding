@@ -2,7 +2,7 @@ import { Controller, Get, Post, Param, Inject } from '@midwayjs/decorator';
 import { Context } from '@midwayjs/koa';
 import { SessionService } from '../service/session.service';
 import { QrService } from '../service/qr.service';
-import { SessionErrorCode } from '@remote-claude/shared';
+import { SessionErrorCode } from '@spark_coder/shared';
 
 @Controller('/api')
 export class SessionController {
@@ -66,7 +66,7 @@ export class SessionController {
       return;
     }
     const serverUrl = this.resolveServerUrl();
-    const { buildPairUrl } = await import('@remote-claude/shared');
+    const { buildPairUrl } = await import('@spark_coder/shared');
     const payload = buildPairUrl(serverUrl, token);
     const png = await this.qrService.toPng(payload);
     this.ctx.set('Content-Type', 'image/png');

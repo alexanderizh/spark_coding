@@ -1,0 +1,12 @@
+2026-03-14 20:21:11.679 INFO 22132 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-14 20:26:18.806 ERROR 22132 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:45:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 20:26:24.754 INFO 29877 [midway:socketio] Socket.io server start success and attach to web server

@@ -21,7 +21,7 @@ exports.Events = {
     SESSION_ERROR: 'session:error',
 };
 // ── QR pairing URL ───────────────────────────────────────────────────────────
-exports.QR_SCHEME = 'remoteclaude';
+exports.QR_SCHEME = 'sparkcoder';
 function buildPairUrl(serverUrl, token) {
     return `${exports.QR_SCHEME}://pair?token=${token}&server=${encodeURIComponent(serverUrl)}`;
 }

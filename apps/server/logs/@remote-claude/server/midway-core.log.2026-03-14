@@ -107,3 +107,25 @@
   cause: undefined
 }
 2026-03-14 19:25:56.437 INFO 60151 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-14 19:46:51.611 ERROR 60151 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:45:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 19:46:58.092 INFO 3451 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-14 20:01:36.139 ERROR 3451 MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.findById (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:45:17)
+    at RelayController.onDisconnect (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/socket/relay.controller.ts:93:47)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/socketio/dist/framework.js:172:91) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-14 20:01:42.725 INFO 61878 [midway:socketio] Socket.io server start success and attach to web server

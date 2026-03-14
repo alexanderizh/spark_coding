@@ -3,7 +3,7 @@ import { InjectEntityModel } from '@midwayjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Session } from '../entity/session.entity';
-import { SessionState, buildPairUrl } from '@remote-claude/shared';
+import { SessionState, buildPairUrl } from '@spark_coder/shared';
 
 const SESSION_TTL_HOURS = 24;
 

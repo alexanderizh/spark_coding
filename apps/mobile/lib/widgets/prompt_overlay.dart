@@ -50,13 +50,13 @@ class _PromptOverlayState extends State<PromptOverlay>
       duration: const Duration(milliseconds: 300),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(
+          begin: const Offset(-1, 0), // Slide from left
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+        );
 
     _animController.forward();
     _startCountdown();
@@ -119,40 +119,41 @@ class _PromptOverlayState extends State<PromptOverlay>
   Widget build(BuildContext context) {
     return SlideTransition(
       position: _slideAnimation,
-      child: _buildCard(context),
+      child: _buildBubble(context),
     );
   }
 
-  Widget _buildCard(BuildContext context) {
+  Widget _buildBubble(BuildContext context) {
     final prompt = widget.prompt;
 
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _borderColorForType(prompt.promptType)),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black54,
-              blurRadius: 20,
-              offset: Offset(0, -4),
-            ),
-          ],
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0), // Light gray bubble
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+          bottomLeft: Radius.circular(4), // "Speech bubble" tail
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(prompt),
-            const Divider(color: Color(0xFF2A2A2A), height: 1),
-            _buildContent(prompt),
-            const Divider(color: Color(0xFF2A2A2A), height: 1),
-            _buildActions(prompt),
-          ],
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(prompt),
+          const Divider(color: Color(0xFFE0E0E0), height: 1),
+          _buildContent(prompt),
+          const Divider(color: Color(0xFFE0E0E0), height: 1),
+          _buildActions(prompt),
+        ],
       ),
     );
   }
@@ -165,17 +166,15 @@ class _PromptOverlayState extends State<PromptOverlay>
           Icon(
             _iconForType(prompt.promptType),
             size: 18,
-            color: _accentColorForType(prompt.promptType),
+            color: Colors.black87,
           ),
           const SizedBox(width: 8),
           Text(
-            prompt.promptType.displayName.toUpperCase(),
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 11,
+            _getChineseDisplayName(prompt.promptType),
+            style: const TextStyle(
+              fontSize: 12,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-              color: _accentColorForType(prompt.promptType),
+              color: Colors.black87,
             ),
           ),
           const Spacer(),
@@ -183,16 +182,12 @@ class _PromptOverlayState extends State<PromptOverlay>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               '${_remainingSeconds}s',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                color: Color(0xFF9E9E9E),
-              ),
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
             ),
           ),
           const SizedBox(width: 8),
@@ -201,11 +196,7 @@ class _PromptOverlayState extends State<PromptOverlay>
             borderRadius: BorderRadius.circular(20),
             child: const Padding(
               padding: EdgeInsets.all(4),
-              child: Icon(
-                Icons.close,
-                size: 18,
-                color: Color(0xFF9E9E9E),
-              ),
+              child: Icon(Icons.close, size: 18, color: Colors.grey),
             ),
           ),
         ],
@@ -226,11 +217,10 @@ class _PromptOverlayState extends State<PromptOverlay>
             constraints: const BoxConstraints(maxHeight: 120),
             child: SingleChildScrollView(
               child: Text(
-                cleanText.isEmpty ? '(no additional context)' : cleanText,
+                cleanText.isEmpty ? '(无额外内容)' : cleanText,
                 style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: Color(0xFFCCCCCC),
+                  fontSize: 13,
+                  color: Colors.black87,
                   height: 1.5,
                 ),
               ),
@@ -245,16 +235,20 @@ class _PromptOverlayState extends State<PromptOverlay>
               maxLines: 3,
               minLines: 2,
               autofocus: true,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                color: Color(0xFFE0E0E0),
-              ),
+              style: const TextStyle(fontSize: 13, color: Colors.black),
               decoration: const InputDecoration(
-                hintText: 'Type your multi-line input here…',
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                hintText: '在此输入多行文本...',
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  borderSide: BorderSide.none,
+                ),
               ),
               textCapitalization: TextCapitalization.none,
               autocorrect: false,
@@ -276,17 +270,16 @@ class _PromptOverlayState extends State<PromptOverlay>
               child: OutlinedButton(
                 onPressed: () => _sendResponse('n\r'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFFF5252),
-                  side: const BorderSide(color: Color(0xFFFF5252)),
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
                   padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text(
-                  'NO',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
+                  '拒绝',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -295,17 +288,16 @@ class _PromptOverlayState extends State<PromptOverlay>
               child: ElevatedButton(
                 onPressed: () => _sendResponse('y\r'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00FF41),
-                  foregroundColor: Colors.black,
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text(
-                  'YES',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
+                  '同意',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -322,34 +314,33 @@ class _PromptOverlayState extends State<PromptOverlay>
             OutlinedButton(
               onPressed: _dismiss,
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF9E9E9E),
-                side: const BorderSide(color: Color(0xFF404040)),
+                foregroundColor: Colors.grey,
+                side: const BorderSide(color: Colors.grey),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 10,
                 ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: const Text(
-                'CANCEL',
-                style: TextStyle(fontFamily: 'monospace', letterSpacing: 1),
-              ),
+              child: const Text('取消'),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
                 onPressed: _sendMultilineInput,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00FF41),
-                  foregroundColor: Colors.black,
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text(
-                  'SEND',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
+                  '发送',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -364,14 +355,12 @@ class _PromptOverlayState extends State<PromptOverlay>
       child: OutlinedButton(
         onPressed: _dismiss,
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF9E9E9E),
-          side: const BorderSide(color: Color(0xFF404040)),
+          foregroundColor: Colors.grey,
+          side: const BorderSide(color: Colors.grey),
           padding: const EdgeInsets.symmetric(vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        child: const Text(
-          'DISMISS',
-          style: TextStyle(fontFamily: 'monospace', letterSpacing: 1.5),
-        ),
+        child: const Text('关闭'),
       ),
     );
   }
@@ -379,34 +368,6 @@ class _PromptOverlayState extends State<PromptOverlay>
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
-
-  Color _borderColorForType(ClaudePromptType type) {
-    switch (type) {
-      case ClaudePromptType.permissionRequest:
-      case ClaudePromptType.toolUseApproval:
-        return const Color(0xFFFFB300);
-      case ClaudePromptType.yesNoConfirm:
-        return const Color(0xFF448AFF);
-      case ClaudePromptType.multilineInput:
-        return const Color(0xFF00FF41);
-      default:
-        return const Color(0xFF404040);
-    }
-  }
-
-  Color _accentColorForType(ClaudePromptType type) {
-    switch (type) {
-      case ClaudePromptType.permissionRequest:
-      case ClaudePromptType.toolUseApproval:
-        return const Color(0xFFFFB300);
-      case ClaudePromptType.yesNoConfirm:
-        return const Color(0xFF448AFF);
-      case ClaudePromptType.multilineInput:
-        return const Color(0xFF00FF41);
-      default:
-        return const Color(0xFF9E9E9E);
-    }
-  }
 
   IconData _iconForType(ClaudePromptType type) {
     switch (type) {
@@ -425,12 +386,29 @@ class _PromptOverlayState extends State<PromptOverlay>
     }
   }
 
+  String _getChineseDisplayName(ClaudePromptType type) {
+    switch (type) {
+      case ClaudePromptType.permissionRequest:
+        return '权限请求';
+      case ClaudePromptType.yesNoConfirm:
+        return '确认请求';
+      case ClaudePromptType.toolUseApproval:
+        return '工具调用审批';
+      case ClaudePromptType.multilineInput:
+        return '多行输入';
+      case ClaudePromptType.slashCommandHint:
+        return '命令提示';
+      case ClaudePromptType.generalInput:
+        return '请输入';
+      case ClaudePromptType.unknown:
+      default:
+        return '提示';
+    }
+  }
+
   /// Strips ANSI escape sequences from [text] for clean display.
   static String _stripAnsi(String text) {
     // Matches ESC[ sequences and single-character ESC sequences.
-    return text.replaceAll(
-      RegExp(r'\x1B(?:\[[0-9;]*[A-Za-z]|[^[\x1B])'),
-      '',
-    );
+    return text.replaceAll(RegExp(r'\x1B(?:\[[0-9;]*[A-Za-z]|[^[\x1B])'), '');
   }
 }

@@ -89,7 +89,7 @@ export interface SessionPingPayload {
 
 // ── QR pairing URL ───────────────────────────────────────────────────────────
 
-export const QR_SCHEME = 'remoteclaude';
+export const QR_SCHEME = 'sparkcoder';
 
 export function buildPairUrl(serverUrl: string, token: string): string {
   return `${QR_SCHEME}://pair?token=${token}&server=${encodeURIComponent(serverUrl)}`;

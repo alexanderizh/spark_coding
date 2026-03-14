@@ -29,11 +29,7 @@ class TerminalState {
   /// Current font size (adjusted via pinch-to-zoom on the terminal view).
   final double fontSize;
 
-  TerminalState copyWith({
-    Terminal? terminal,
-    int? lastSeq,
-    double? fontSize,
-  }) {
+  TerminalState copyWith({Terminal? terminal, int? lastSeq, double? fontSize}) {
     return TerminalState(
       terminal: terminal ?? this.terminal,
       lastSeq: lastSeq ?? this.lastSeq,
@@ -48,15 +44,15 @@ class TerminalState {
 
 class TerminalNotifier extends StateNotifier<TerminalState> {
   TerminalNotifier({required SocketService socketService})
-      : _socketService = socketService,
-        super(
-          TerminalState(
-            terminal: Terminal(
-              maxLines: 10000,
-              onOutput: (data) => socketService.sendInput(data),
-            ),
+    : _socketService = socketService,
+      super(
+        TerminalState(
+          terminal: Terminal(
+            maxLines: 10000,
+            onOutput: (data) => socketService.sendInput(data),
           ),
-        ) {
+        ),
+      ) {
     _listenToOutput();
   }
 
@@ -67,11 +63,14 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   final Map<int, TerminalOutput> _pendingChunks = {};
 
   void _listenToOutput() {
-    _outputSub = _socketService.terminalOutput.listen((output) {
-      _handleOutput(output);
-    }, onError: (Object e) {
-      debugPrint('[TerminalNotifier] Stream error: $e');
-    });
+    _outputSub = _socketService.terminalOutput.listen(
+      (output) {
+        _handleOutput(output);
+      },
+      onError: (Object e) {
+        debugPrint('[TerminalNotifier] Stream error: $e');
+      },
+    );
   }
 
   void _handleOutput(TerminalOutput output) {
@@ -152,9 +151,9 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
 final terminalNotifierProvider =
     StateNotifierProvider<TerminalNotifier, TerminalState>((ref) {
-  final socketService = ref.watch(socketServiceProvider);
-  return TerminalNotifier(socketService: socketService);
-});
+      final socketService = ref.watch(socketServiceProvider);
+      return TerminalNotifier(socketService: socketService);
+    });
 
 /// Convenience provider for the xterm [Terminal] instance.
 final terminalProvider = Provider<Terminal>((ref) {

@@ -6,7 +6,7 @@ import { AgentSocketClient } from './socket/socket-client';
 async function main(): Promise<void> {
   const config = loadConfig();
 
-  console.log(`[remote-claude] Connecting to server: ${config.serverUrl}`);
+  console.log(`[spark] Connecting to server: ${config.serverUrl}`);
 
   let session;
   try {
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
 
   // Graceful shutdown
   const shutdown = () => {
-    console.log('\n[remote-claude] Shutting down…');
+    console.log('\n[spark] Shutting down…');
     client.destroy();
     process.exit(0);
   };

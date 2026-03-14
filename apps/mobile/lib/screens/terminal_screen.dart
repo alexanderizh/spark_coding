@@ -10,8 +10,6 @@ import '../models/session_model.dart';
 import '../providers/connection_provider.dart';
 import '../providers/prompt_provider.dart';
 import '../providers/session_provider.dart';
-import '../providers/terminal_provider.dart';
-import '../services/socket_service.dart';
 import '../utils/app_logger.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/input_toolbar.dart';
@@ -53,12 +51,12 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   void _showSessionError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Server: $message'),
-        backgroundColor: const Color(0xFF3A1A1A),
+        content: Text('服务端: $message'),
+        backgroundColor: const Color(0xFFD32F2F),
         duration: const Duration(seconds: 5),
         action: SnackBarAction(
-          label: 'Dismiss',
-          textColor: const Color(0xFFFF5252),
+          label: '忽略',
+          textColor: Colors.white,
           onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
         ),
       ),
@@ -66,7 +64,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   }
 
   Future<void> _reconnect() async {
-    AppLogger.info('TerminalScreen', '用户点击 RETRY 重连');
+    AppLogger.info('TerminalScreen', '用户点击重试重连');
     final session = ref.read(sessionProvider);
     if (session == null) {
       AppLogger.warn('TerminalScreen', '无 session，返回首页');
@@ -107,7 +105,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         connectionStatus == ConnectionStatus.error;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black, // Keep terminal background black
       appBar: _buildAppBar(context, connectionStatus),
       body: Column(
         children: [
@@ -137,12 +135,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                   },
                 ),
 
-                // Prompt overlay (slides in from bottom)
+                // Prompt overlay (Chat bubble style on the left)
                 if (currentPrompt != null)
                   Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
+                    left: 16,
+                    right:
+                        64, // Leave space on right to look like "left bubble"
+                    bottom: 16,
                     child: PromptOverlay(
                       prompt: currentPrompt,
                       onDismiss: () =>
@@ -170,12 +169,20 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     ConnectionStatus status,
   ) {
     return AppBar(
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios, size: 18),
-        onPressed: () => context.go(AppRoutes.home),
-        tooltip: 'Back to home',
+        onPressed: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
+        tooltip: '返回',
       ),
-      title: const Text('TERMINAL'),
+      title: const Text('终端'),
       actions: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
@@ -183,8 +190,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         ),
         IconButton(
           icon: const Icon(Icons.settings, size: 20),
-          onPressed: () => context.go(AppRoutes.settings),
-          tooltip: 'Settings',
+          onPressed: () => context.push(AppRoutes.settings),
+          tooltip: '设置',
         ),
         const SizedBox(width: 4),
       ],
@@ -218,10 +225,7 @@ class _ReconnectBannerState extends State<_ReconnectBanner> {
   bool _expanded = false;
 
   String get _displayText =>
-      widget.errorMessage ??
-      (widget.isError
-          ? 'Connection error. Tap to retry.'
-          : 'Disconnected from relay server.');
+      widget.errorMessage ?? (widget.isError ? '连接错误。点击重试。' : '与中继服务器断开连接。');
 
   Future<void> _copyToClipboard() async {
     await Clipboard.setData(ClipboardData(text: _displayText));
@@ -229,7 +233,7 @@ class _ReconnectBannerState extends State<_ReconnectBanner> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('已复制到剪贴板'),
-        backgroundColor: Color(0xFF1A3A1A),
+        backgroundColor: Color(0xFF333333),
         duration: Duration(seconds: 2),
       ),
     );
@@ -238,7 +242,7 @@ class _ReconnectBannerState extends State<_ReconnectBanner> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: widget.isError ? const Color(0xFF2A0A0A) : const Color(0xFF1A1A0A),
+      color: widget.isError ? const Color(0xFFE57373) : const Color(0xFFFFD54F),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,102 +250,108 @@ class _ReconnectBannerState extends State<_ReconnectBanner> {
           Icon(
             widget.isError ? Icons.error_outline : Icons.wifi_off,
             size: 18,
-            color: widget.isError
-                ? const Color(0xFFFF5252)
-                : const Color(0xFFFFB300),
+            color: Colors.black87,
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: InkWell(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => setState(() => _expanded = !_expanded),
-              child: Tooltip(
-                message: _expanded ? '点击收起' : '点击展开查看详情',
-                child: AnimatedSize(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _displayText,
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          color: widget.isError
-                              ? const Color(0xFFFF8A80)
-                              : const Color(0xFFFFE082),
-                        ),
-                        maxLines: _expanded ? null : 1,
-                        overflow: _expanded ? null : TextOverflow.ellipsis,
-                      ),
-                      if (_expanded)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
-                            children: [
-                              Text(
-                                '点击收起',
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                  color: Colors.white38,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              InkWell(
-                                onTap: _copyToClipboard,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.copy,
-                                      size: 14,
-                                      color: Colors.white54,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '复制',
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 10,
-                                        color: Colors.white54,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Tooltip(
+                  message: _expanded ? '点击收起' : '点击展开查看详情',
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _displayText,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black87,
                           ),
+                          maxLines: _expanded ? null : 1,
+                          overflow: _expanded ? null : TextOverflow.ellipsis,
                         ),
-                    ],
+                        if (_expanded)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const Text(
+                                  '点击收起',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                InkWell(
+                                  onTap: _copyToClipboard,
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.copy,
+                                        size: 14,
+                                        color: Colors.black54,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        '复制',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: _copyToClipboard,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Icon(Icons.copy, size: 18, color: Colors.black54),
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: widget.onReconnect,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Text(
+                '重试',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
           const SizedBox(width: 8),
           InkWell(
-            onTap: widget.onReconnect,
-            child: const Text(
-              'RETRY',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: Color(0xFF00FF41),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          InkWell(
             onTap: widget.onDisconnect,
-            child: const Text(
-              'QUIT',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: Color(0xFF9E9E9E),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Text(
+                '退出',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
               ),
             ),
           ),

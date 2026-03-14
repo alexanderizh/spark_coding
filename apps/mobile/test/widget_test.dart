@@ -18,10 +18,7 @@ import '../lib/models/claude_prompt_model.dart';
 void main() {
   group('SessionState', () {
     test('fromString returns correct enum value for known states', () {
-      expect(
-        SessionState.fromString('paired'),
-        equals(SessionState.paired),
-      );
+      expect(SessionState.fromString('paired'), equals(SessionState.paired));
       expect(
         SessionState.fromString('waiting_for_agent'),
         equals(SessionState.waitingForAgent),
@@ -38,14 +35,8 @@ void main() {
         SessionState.fromString('mobile_disconnected'),
         equals(SessionState.mobileDisconnected),
       );
-      expect(
-        SessionState.fromString('expired'),
-        equals(SessionState.expired),
-      );
-      expect(
-        SessionState.fromString('error'),
-        equals(SessionState.error),
-      );
+      expect(SessionState.fromString('expired'), equals(SessionState.expired));
+      expect(SessionState.fromString('error'), equals(SessionState.error));
     });
 
     test('fromString returns unknown for unrecognised values', () {
@@ -53,10 +44,7 @@ void main() {
         SessionState.fromString('not_a_real_state'),
         equals(SessionState.unknown),
       );
-      expect(
-        SessionState.fromString(''),
-        equals(SessionState.unknown),
-      );
+      expect(SessionState.fromString(''), equals(SessionState.unknown));
     });
   });
 
@@ -172,7 +160,10 @@ void main() {
 
     test('requiresMultilineInput is true only for multiline_input', () {
       expect(ClaudePromptType.multilineInput.requiresMultilineInput, isTrue);
-      expect(ClaudePromptType.permissionRequest.requiresMultilineInput, isFalse);
+      expect(
+        ClaudePromptType.permissionRequest.requiresMultilineInput,
+        isFalse,
+      );
     });
   });
 

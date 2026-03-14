@@ -5,10 +5,7 @@ import '../providers/connection_provider.dart';
 /// A small status badge showing the current WebSocket connection state.
 /// Used in the AppBar of [TerminalScreen] and [HomeScreen].
 class ConnectionBadge extends StatelessWidget {
-  const ConnectionBadge({
-    super.key,
-    required this.status,
-  });
+  const ConnectionBadge({super.key, required this.status});
 
   final ConnectionStatus status;
 
@@ -24,10 +21,10 @@ class ConnectionBadge extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 11,
+            fontSize: 12,
             letterSpacing: 0.5,
-            color: Color(0xFFBDBDBD),
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -37,13 +34,13 @@ class ConnectionBadge extends StatelessWidget {
   (Color, String) _resolveAppearance(ConnectionStatus status) {
     switch (status) {
       case ConnectionStatus.connected:
-        return (const Color(0xFF00FF41), 'Connected');
+        return (Colors.green, '已连接');
       case ConnectionStatus.connecting:
-        return (const Color(0xFFFFB300), 'Connecting...');
+        return (Colors.orange, '连接中...');
       case ConnectionStatus.error:
-        return (const Color(0xFFFF5252), 'Error');
+        return (Colors.red, '错误');
       case ConnectionStatus.disconnected:
-        return (const Color(0xFF616161), 'Disconnected');
+        return (Colors.grey, '已断开');
     }
   }
 }
@@ -71,9 +68,10 @@ class _PulseDotState extends State<_PulseDot>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _opacity = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _opacity = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
     if (widget.pulsing) _controller.repeat(reverse: true);
   }
 
@@ -112,13 +110,6 @@ class _PulseDotState extends State<_PulseDot>
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color.withAlpha((opacity * 255).round()),
-        boxShadow: [
-          BoxShadow(
-            color: color.withAlpha(100),
-            blurRadius: 4,
-            spreadRadius: 1,
-          ),
-        ],
       ),
     );
   }

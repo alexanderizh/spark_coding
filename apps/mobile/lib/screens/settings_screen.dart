@@ -6,7 +6,6 @@ import '../app/router.dart';
 import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
-import '../services/session_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -52,12 +51,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _disconnectAndReset() async {
     final confirmed = await _showConfirmDialog(
-      title: 'Disconnect & Reset',
+      title: '断开并重置',
       message:
-          'This will disconnect from the relay server and clear all saved '
-          'session data. You will need to scan a new QR code to reconnect.\n\n'
-          'Continue?',
-      confirmLabel: 'RESET',
+          '这将断开与中继服务器的连接并清除所有保存的会话数据。您需要重新扫描二维码才能连接。\n\n'
+          '继续？',
+      confirmLabel: '重置',
       destructive: true,
     );
 
@@ -76,9 +74,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (e) {
       setState(() => _isSaving = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reset failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('重置失败: $e')));
     }
   }
 
@@ -91,44 +89,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: Colors.white,
         title: Text(
           title,
           style: const TextStyle(
-            fontFamily: 'monospace',
-            color: Color(0xFFE0E0E0),
-            fontSize: 16,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
         content: Text(
           message,
           style: const TextStyle(
-            fontFamily: 'monospace',
-            color: Color(0xFF9E9E9E),
-            fontSize: 13,
+            color: Colors.black87,
+            fontSize: 14,
             height: 1.5,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text(
-              'CANCEL',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                color: Color(0xFF9E9E9E),
-              ),
-            ),
+            child: const Text('取消', style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               confirmLabel,
               style: TextStyle(
-                fontFamily: 'monospace',
-                color: destructive
-                    ? const Color(0xFFFF5252)
-                    : const Color(0xFF00FF41),
+                color: destructive ? const Color(0xFFD32F2F) : Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -145,15 +133,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => context.go(AppRoutes.terminal),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
         ),
-        title: const Text('SETTINGS'),
+        title: const Text('设置'),
       ),
       body: _isSaving
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
               ),
             )
           : _buildForm(context),
@@ -169,31 +162,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // ----------------------------------------------------------------
         // Connection section
         // ----------------------------------------------------------------
-        _sectionHeader('CONNECTION'),
+        _sectionHeader('连接信息'),
         const SizedBox(height: 12),
 
         // Display-only fields for current session
         if (session != null) ...[
-          _readOnlyField(
-            label: 'Server URL',
-            value: session.serverUrl,
-          ),
+          _readOnlyField(label: '服务器地址', value: session.serverUrl),
+          const SizedBox(height: 8),
+          _readOnlyField(label: '会话 ID', value: session.sessionId),
           const SizedBox(height: 8),
           _readOnlyField(
-            label: 'Session ID',
-            value: session.sessionId,
-          ),
-          const SizedBox(height: 8),
-          _readOnlyField(
-            label: 'Status',
-            value: session.state.value,
+            label: '状态',
+            value: session
+                .state
+                .value, // You might want to map this to Chinese too
           ),
           const SizedBox(height: 16),
         ] else ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              'No active session. Scan a QR code to connect.',
+              '无活动会话。请扫描二维码连接。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -203,26 +192,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // ----------------------------------------------------------------
         // Terminal section
         // ----------------------------------------------------------------
-        _sectionHeader('TERMINAL'),
+        _sectionHeader('终端设置'),
         const SizedBox(height: 12),
 
         // Font size slider
         Row(
           children: [
             Text(
-              'Font Size',
+              '字体大小',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF9E9E9E),
-                    fontSize: 13,
-                  ),
+                color: Colors.black87,
+                fontSize: 14,
+              ),
             ),
             const Spacer(),
             Text(
               '${_fontSize.toStringAsFixed(0)}px',
               style: const TextStyle(
-                fontFamily: 'monospace',
-                color: Color(0xFF00FF41),
-                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+                fontSize: 14,
               ),
             ),
           ],
@@ -232,8 +221,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           min: 8,
           max: 24,
           divisions: 16,
-          activeColor: const Color(0xFF00FF41),
-          inactiveColor: const Color(0xFF2A2A2A),
+          activeColor: Colors.black,
+          inactiveColor: const Color(0xFFEEEEEE),
           onChanged: (value) {
             setState(() => _fontSize = value);
             _saveFontSize(value);
@@ -244,51 +233,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '8px',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              Text(
-                '24px',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              Text('8px', style: Theme.of(context).textTheme.bodySmall),
+              Text('24px', style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),
 
         const SizedBox(height: 32),
-        const Divider(color: Color(0xFF2A2A2A)),
+        const Divider(color: Color(0xFFEEEEEE)),
         const SizedBox(height: 24),
 
         // ----------------------------------------------------------------
         // Danger zone
         // ----------------------------------------------------------------
-        _sectionHeader('DANGER ZONE'),
+        _sectionHeader('危险区域'),
         const SizedBox(height: 12),
 
         OutlinedButton.icon(
           onPressed: _disconnectAndReset,
-          icon: const Icon(Icons.power_settings_new, size: 18),
-          label: const Text('DISCONNECT & RESET'),
+          icon: const Icon(Icons.delete_forever, size: 18),
+          label: const Text('断开连接并重置'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFFFF5252),
-            side: const BorderSide(color: Color(0xFFFF5252)),
+            foregroundColor: const Color(0xFFD32F2F),
+            side: const BorderSide(color: Color(0xFFD32F2F)),
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
 
         const SizedBox(height: 48),
-        const Divider(color: Color(0xFF2A2A2A)),
+        const Divider(color: Color(0xFFEEEEEE)),
         const SizedBox(height: 24),
 
         // ----------------------------------------------------------------
         // About section
         // ----------------------------------------------------------------
-        _sectionHeader('ABOUT'),
+        _sectionHeader('关于'),
         const SizedBox(height: 12),
-        _readOnlyField(label: 'Version', value: _appVersion),
+        _readOnlyField(label: '版本', value: _appVersion),
         const SizedBox(height: 8),
-        _readOnlyField(label: 'Platform', value: 'Flutter 3.19+'),
+        _readOnlyField(label: '平台', value: 'Flutter 3.19+'),
         const SizedBox(height: 40),
       ],
     );
@@ -298,10 +281,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Text(
       title,
       style: const TextStyle(
-        fontFamily: 'monospace',
-        color: Color(0xFF00FF41),
-        fontSize: 11,
-        letterSpacing: 2,
+        color: Colors.black54,
+        fontSize: 12,
+        letterSpacing: 1.2,
         fontWeight: FontWeight.bold,
       ),
     );
@@ -309,29 +291,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _readOnlyField({required String label, required String value}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              color: Color(0xFF9E9E9E),
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: Colors.grey, fontSize: 13),
           ),
           Expanded(
             child: Text(
               value,
               style: const TextStyle(
-                fontFamily: 'monospace',
-                color: Color(0xFFE0E0E0),
-                fontSize: 12,
+                color: Colors.black87,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
               overflow: TextOverflow.ellipsis,
             ),

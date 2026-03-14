@@ -65,20 +65,20 @@ class ClaudePrompt {
   final int timestamp;
 
   factory ClaudePrompt.fromJson(Map<String, dynamic> json) => ClaudePrompt(
-        sessionId: json['sessionId'] as String,
-        promptType: ClaudePromptType.fromString(
-          json['promptType'] as String? ?? 'unknown',
-        ),
-        rawText: json['rawText'] as String? ?? '',
-        timestamp: json['timestamp'] as int,
-      );
+    sessionId: json['sessionId'] as String,
+    promptType: ClaudePromptType.fromString(
+      json['promptType'] as String? ?? 'unknown',
+    ),
+    rawText: json['rawText'] as String? ?? '',
+    timestamp: json['timestamp'] as int,
+  );
 
   Map<String, dynamic> toJson() => {
-        'sessionId': sessionId,
-        'promptType': promptType.value,
-        'rawText': rawText,
-        'timestamp': timestamp,
-      };
+    'sessionId': sessionId,
+    'promptType': promptType.value,
+    'rawText': rawText,
+    'timestamp': timestamp,
+  };
 
   @override
   bool operator ==(Object other) {
@@ -91,8 +91,7 @@ class ClaudePrompt {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(sessionId, promptType, rawText, timestamp);
+  int get hashCode => Object.hash(sessionId, promptType, rawText, timestamp);
 
   @override
   String toString() =>

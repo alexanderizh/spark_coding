@@ -2,7 +2,7 @@ import { Controller, Get, Query, Inject } from '@midwayjs/decorator';
 import { Context } from '@midwayjs/koa';
 import { SessionService } from '../service/session.service';
 import { AdminAuthMiddleware } from '../middleware/adminAuth.middleware';
-import { SessionState } from '@remote-claude/shared';
+import { SessionState } from '@spark_coder/shared';
 
 @Controller('/api/admin', { middleware: [AdminAuthMiddleware] })
 export class AdminController {

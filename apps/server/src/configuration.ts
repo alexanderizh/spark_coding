@@ -27,6 +27,6 @@ export class ContainerLifeCycle implements ILifeCycle {
       await next();
     });
 
-    console.log('[remote-claude] Server ready');
+    console.log('[spark_coder] Server ready');
   }
 }

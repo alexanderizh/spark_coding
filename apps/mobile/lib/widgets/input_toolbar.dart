@@ -10,10 +10,7 @@ typedef InputCallback = void Function(String data);
 ///   - A text input field with a Send button.
 ///   - A "Multi-line" toggle that expands the input to a multi-line area.
 class InputToolbar extends StatefulWidget {
-  const InputToolbar({
-    super.key,
-    required this.onSendInput,
-  });
+  const InputToolbar({super.key, required this.onSendInput});
 
   final InputCallback onSendInput;
 
@@ -38,38 +35,18 @@ class _InputToolbarState extends State<InputToolbar> {
   // ---------------------------------------------------------------------------
 
   List<_QuickAction> get _quickActions => [
-        _QuickAction(label: 'y', data: 'y\r', tooltip: 'Send "y" (yes)'),
-        _QuickAction(label: 'n', data: 'n\r', tooltip: 'Send "n" (no)'),
-        _QuickAction(
-          label: 'Ctrl+C',
-          data: '\x03',
-          tooltip: 'Interrupt (Ctrl+C)',
-        ),
-        _QuickAction(
-          label: 'Ctrl+D',
-          data: '\x04',
-          tooltip: 'EOF / logout (Ctrl+D)',
-        ),
-        _QuickAction(label: 'Tab', data: '\t', tooltip: 'Tab completion'),
-        _QuickAction(label: '↑', data: '\x1b[A', tooltip: 'Arrow up'),
-        _QuickAction(label: '↓', data: '\x1b[B', tooltip: 'Arrow down'),
-        _QuickAction(label: 'Esc', data: '\x1b', tooltip: 'Escape'),
-        _QuickAction(
-          label: '/clear',
-          data: '/clear\r',
-          tooltip: 'Clear Claude context',
-        ),
-        _QuickAction(
-          label: '/help',
-          data: '/help\r',
-          tooltip: 'Show Claude help',
-        ),
-        _QuickAction(
-          label: '/compact',
-          data: '/compact\r',
-          tooltip: 'Compact Claude output',
-        ),
-      ];
+    _QuickAction(label: 'y', data: 'y\r', tooltip: '发送 "y" (是)'),
+    _QuickAction(label: 'n', data: 'n\r', tooltip: '发送 "n" (否)'),
+    _QuickAction(label: 'Ctrl+C', data: '\x03', tooltip: '中断 (Ctrl+C)'),
+    _QuickAction(label: 'Ctrl+D', data: '\x04', tooltip: 'EOF / 退出 (Ctrl+D)'),
+    _QuickAction(label: 'Tab', data: '\t', tooltip: 'Tab 补全'),
+    _QuickAction(label: '↑', data: '\x1b[A', tooltip: '向上箭头'),
+    _QuickAction(label: '↓', data: '\x1b[B', tooltip: '向下箭头'),
+    _QuickAction(label: 'Esc', data: '\x1b', tooltip: 'Esc 键'),
+    _QuickAction(label: '/clear', data: '/clear\r', tooltip: '清除上下文'),
+    _QuickAction(label: '/help', data: '/help\r', tooltip: '显示帮助'),
+    _QuickAction(label: '/compact', data: '/compact\r', tooltip: '压缩输出'),
+  ];
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -110,29 +87,31 @@ class _InputToolbarState extends State<InputToolbar> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF111111),
-        border: Border(
-          top: BorderSide(color: Color(0xFF2A2A2A)),
-        ),
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, -2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildQuickActionRow(),
-          _buildInputRow(),
-        ],
+        children: [_buildQuickActionRow(), _buildInputRow()],
       ),
     );
   }
 
   Widget _buildQuickActionRow() {
     return SizedBox(
-      height: 36,
+      height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         itemCount: _quickActions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final action = _quickActions[index];
           return _QuickActionChip(
@@ -147,10 +126,10 @@ class _InputToolbarState extends State<InputToolbar> {
   Widget _buildInputRow() {
     return Padding(
       padding: EdgeInsets.only(
-        left: 8,
-        right: 8,
-        top: 4,
-        bottom: MediaQuery.of(context).padding.bottom + 4,
+        left: 16,
+        right: 16,
+        top: 8,
+        bottom: MediaQuery.of(context).padding.bottom + 8,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -158,46 +137,50 @@ class _InputToolbarState extends State<InputToolbar> {
           // Multi-line toggle button
           _ToolbarIconButton(
             icon: _multilineMode ? Icons.unfold_less : Icons.unfold_more,
-            tooltip: _multilineMode ? 'Single line' : 'Multi-line input',
+            tooltip: _multilineMode ? '单行模式' : '多行模式',
             isActive: _multilineMode,
             onTap: _toggleMultiline,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
 
-          // Text input field
+          // Text input field (Chat style)
           Expanded(
-            child: TextField(
-              controller: _textController,
-              focusNode: _focusNode,
-              maxLines: _multilineMode ? 4 : 1,
-              minLines: 1,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                color: Color(0xFFE0E0E0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(24),
               ),
-              decoration: const InputDecoration(
-                hintText: 'Enter command or message…',
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                isDense: true,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _textController,
+                focusNode: _focusNode,
+                maxLines: _multilineMode ? 4 : 1,
+                minLines: 1,
+                style: const TextStyle(fontSize: 14, color: Colors.black),
+                decoration: const InputDecoration(
+                  hintText: '输入命令或消息...',
+                  hintStyle: TextStyle(color: Colors.grey),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  isDense: true,
+                ),
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendTextInput(),
+                keyboardType: _multilineMode
+                    ? TextInputType.multiline
+                    : TextInputType.text,
+                textCapitalization: TextCapitalization.none,
+                autocorrect: false,
+                enableSuggestions: false,
               ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _sendTextInput(),
-              keyboardType: _multilineMode
-                  ? TextInputType.multiline
-                  : TextInputType.text,
-              textCapitalization: TextCapitalization.none,
-              autocorrect: false,
-              enableSuggestions: false,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
 
           // Send button
           _ToolbarIconButton(
             icon: Icons.send,
-            tooltip: 'Send',
+            tooltip: '发送',
             onTap: _sendTextInput,
             isPrimary: true,
           ),
@@ -224,10 +207,7 @@ class _QuickAction {
 }
 
 class _QuickActionChip extends StatelessWidget {
-  const _QuickActionChip({
-    required this.action,
-    required this.onTap,
-  });
+  const _QuickActionChip({required this.action, required this.onTap});
 
   final _QuickAction action;
   final VoidCallback onTap;
@@ -238,20 +218,20 @@ class _QuickActionChip extends StatelessWidget {
       message: action.tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFF2A2A2A),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: const Color(0xFF404040)),
+            color: const Color(0xFFF0F0F0),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE0E0E0)),
           ),
           child: Text(
             action.label,
             style: const TextStyle(
-              fontFamily: 'monospace',
               fontSize: 12,
-              color: Color(0xFFE0E0E0),
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
             ),
           ),
         ),
@@ -278,35 +258,27 @@ class _ToolbarIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isPrimary
-        ? const Color(0xFF00FF41)
-        : isActive
-            ? const Color(0xFF003300)
-            : const Color(0xFF2A2A2A);
-
-    final iconColor = isPrimary
         ? Colors.black
         : isActive
-            ? const Color(0xFF00FF41)
-            : const Color(0xFF9E9E9E);
+        ? Colors.black12
+        : Colors.transparent;
+
+    final iconColor = isPrimary
+        ? Colors.white
+        : isActive
+        ? Colors.black
+        : Colors.grey;
 
     return Tooltip(
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: isPrimary
-                  ? const Color(0xFF00FF41)
-                  : const Color(0xFF404040),
-            ),
-          ),
-          child: Icon(icon, size: 18, color: iconColor),
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+          child: Icon(icon, size: 20, color: iconColor),
         ),
       ),
     );

@@ -51,14 +51,14 @@ yarn start:server
 **验证服务端正常**：
 ```bash
 curl -X POST http://localhost:7001/api/session
-# 应返回: {"success":true,"data":{"sessionId":"...","token":"...","qrPayload":"remoteclaude://pair?..."}}
+# 应返回: {"success":true,"data":{"sessionId":"...","token":"...","qrPayload":"sparkcoder://pair?..."}}
 ```
 
 **配置项**（`apps/server/.env`）：
 ```env
 PORT=7001          # 监听端口
 NODE_ENV=local     # 环境标识
-# DB_PATH=./data/remote-claude.db  # 数据库路径（可选）
+# DB_PATH=./data/spark_coder.db  # 数据库路径（可选）
 ```
 
 ---
@@ -68,29 +68,42 @@ NODE_ENV=local     # 环境标识
 **新开一个终端窗口**，在目标项目目录下：
 
 ```bash
-# 开发模式
+# 方式一：从源码运行（开发）
 yarn dev:terminal
 
-# 或指定参数
+# 或指定参数（覆盖配置文件）
 yarn dev:terminal -- --server-url http://localhost:7001 --cwd /path/to/your/project
 
 # 生产模式（构建后）
 yarn build:terminal
 yarn start:terminal
+
+# 方式二：通过 npm 安装后使用 spark 命令（发布后）
+# npm install -g @spark_coder/terminal
+# spark
 ```
 
-**参数说明**：
+**配置项**：
+- 开发：`apps/terminal/.env`（复制 `.env.example`）
+- 生产/打包：`apps/terminal/.prod.env`（复制 `.prod.env.example`）
+
+| 变量 | 默认值 | 说明 |
+|------|-------|------|
+| `REMOTE_CLAUDE_SERVER` | `http://localhost:7001` | 中继服务器地址 |
+| `CLAUDE_PATH` | `claude` | Claude CLI 可执行文件路径 |
+
+**CLI 参数**（可覆盖配置文件）：
 
 | 参数 | 默认值 | 说明 |
 |------|-------|------|
-| `--server-url` | `http://localhost:7001` | 中继服务器地址 |
-| `--claude-path` | `claude` | Claude CLI 可执行文件路径 |
+| `--server-url` | 来自 `.env` 或 `http://localhost:7001` | 中继服务器地址 |
+| `--claude-path` | 来自 `.env` 或 `claude` | Claude CLI 可执行文件路径 |
 | `--cwd` | 当前目录 | Claude CLI 工作目录 |
 
 启动后终端会显示二维码：
 
 ```
-  remote-claude  — scan to pair your phone
+  spark  — scan to pair your phone
 
   ██████████████████████
   ██ ▄▄▄▄▄ █▄▀▄ █▄▄ ██
@@ -169,7 +182,7 @@ wscat -c "ws://localhost:7001" --header "Authorization: Bearer TOKEN"
 
 ```bash
 # 使用 sqlite3 命令行（或 DB Browser for SQLite 图形工具）
-sqlite3 ~/apark_coding/apps/server/data/remote-claude.db
+sqlite3 ~/apark_coding/apps/server/data/spark_coder.db
 .tables
 SELECT id, token, state, paired_at FROM sessions;
 ```
@@ -201,7 +214,7 @@ xcode-select --install
 
 **Q: 服务端启动报 `EADDRINUSE: address already in use :::7001`**
 
-端口被占用，修改 `apps/server/.env` 中的 `PORT`，同时用 `--server-url` 告知终端代理新地址。
+端口被占用，修改 `apps/server/.env` 中的 `PORT`，同时修改 `apps/terminal/.env`（开发）或 `.prod.env`（生产）中的 `REMOTE_CLAUDE_SERVER`。
 
 **Q: 手机扫码后显示「Agent is not yet connected」**
 
@@ -223,8 +236,4 @@ flutter run
 
 **Q: 如何在局域网内使用（手机和电脑在同一 WiFi）**
 
-将服务端部署在电脑上，`--server-url` 改为电脑的局域网 IP：
-```bash
-yarn dev:terminal -- --server-url http://192.168.1.100:7001
-```
-同时修改 `apps/server/.env` 确保服务端监听 `0.0.0.0`（MidwayJS 默认即是）。
+将服务端部署在电脑上，在 `apps/terminal/.env`（开发）或 `.prod.env`（生产）中设置 `REMOTE_CLAUDE_SERVER=http://192.168.1.100:7001`（电脑的局域网 IP）。同时修改 `apps/server/.env` 确保服务端监听 `0.0.0.0`（MidwayJS 默认即是）。

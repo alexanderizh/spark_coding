@@ -12,7 +12,7 @@ import {
   SessionStatePayload,
   SessionErrorPayload,
   ClaudePromptType,
-} from '@remote-claude/shared';
+} from '@spark_coder/shared';
 import { AgentConfig } from '../utils/config';
 import { PtyManager } from '../pty/pty-manager';
 import { PromptDetector } from '../pty/prompt-detector';
@@ -140,7 +140,7 @@ export class AgentSocketClient {
     this.socket.on(Events.SESSION_ERROR, (payload: SessionErrorPayload) => {
       console.error(`[error] ${payload.code}: ${payload.message}`);
       if (payload.code === SessionErrorCode.SESSION_EXPIRED) {
-        console.error('[session] Session expired — please restart remote-claude');
+        console.error('[session] Session expired — please restart spark');
         this.destroy();
         process.exit(1);
       }

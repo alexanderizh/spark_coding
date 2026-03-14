@@ -1,4 +1,4 @@
-# remote-claude
+# spark_coder
 
 > 用手机远程控制主机上的 Claude CLI —— 扫码配对，实时交互。
 
@@ -6,7 +6,7 @@
 
 ## 是什么
 
-remote-claude 是一个三端协同系统，让你在手机上实时查看并控制运行在主机上的 Claude CLI（以及未来更多 CLI 工具）。灵感来源于开源项目 [Happy Coder](https://github.com/slopus/happy)。
+spark_coder 是一个三端协同系统，让你在手机上实时查看并控制运行在主机上的 Claude CLI（以及未来更多 CLI 工具）。灵感来源于开源项目 [Happy Coder](https://github.com/slopus/happy)。
 
 ```
 主机终端 (terminal)  ←──WebSocket──→  中继服务器 (server)  ←──WebSocket──→  手机 App (mobile)
@@ -31,7 +31,7 @@ remote-claude 是一个三端协同系统，让你在手机上实时查看并控
 ## 项目结构
 
 ```
-remote-claude/
+spark_coder/
 ├── docs/                    # 文档（本目录）
 ├── packages/
 │   └── shared/              # TypeScript 共享协议类型

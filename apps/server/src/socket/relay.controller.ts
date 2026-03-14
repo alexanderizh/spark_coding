@@ -15,7 +15,7 @@ import {
   SessionStatePayload,
   SessionPairPayload,
   SessionErrorPayload,
-} from '@remote-claude/shared';
+} from '@spark_coder/shared';
 
 const MAX_PAYLOAD_BYTES = 64 * 1024; // 64 KB
 const RATE_LIMIT_WINDOW_MS = 1000;
