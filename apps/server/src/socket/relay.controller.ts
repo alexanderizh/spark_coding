@@ -91,6 +91,10 @@ export class RelayController {
     if (sessionId) {
       // 直接通过 sessionId 连接
       session = await this.sessionService.findById(sessionId);
+      // 兜底：移动端可能误将 token 当成 sessionId 传入
+      if (!session && token) {
+        session = await this.sessionService.findByToken(token);
+      }
     } else if (token) {
       // 通过 token 连接（传统方式，用于配对流程）
       session = await this.sessionService.findByToken(token);

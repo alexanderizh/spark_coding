@@ -211,10 +211,24 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     required String sessionId,
     String? desktopDeviceId,
   }) async {
+    // QR 码中只含 token，需要从服务器获取真实 sessionId（UUID）
+    String resolvedSessionId = sessionId;
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '$serverUrl/api/session/$token',
+      );
+      final realId = response.data?['data']?['sessionId'] as String?;
+      if (realId != null && realId.isNotEmpty) {
+        resolvedSessionId = realId;
+      }
+    } catch (_) {
+      // 网络失败时回退到传入的 sessionId
+    }
+
     final saved = await _sessionService.saveOrUpdateLink(
       serverUrl: serverUrl,
       token: token,
-      sessionId: sessionId,
+      sessionId: resolvedSessionId,
       cliType: CliType.claude,
       setActive: true,
       desktopDeviceId: desktopDeviceId,
