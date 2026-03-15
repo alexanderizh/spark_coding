@@ -23,12 +23,19 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   DateTime? _lastBackPressTime;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(() => ref.read(linkNotifierProvider.notifier).init());
     _listenForDeletion();
+    // 每 30s 自动刷新一次，确保桌面端启动后能及时显示在线状态
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        ref.read(linkNotifierProvider.notifier).refreshStatus();
+      }
+    });
   }
 
   @override
@@ -59,6 +66,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   void dispose() {
     routeObserver.unsubscribe(this);
     _deletedSub?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -167,11 +175,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                         ...offlineLinks.map(
                           (link) => Padding(
                             padding: const EdgeInsets.only(bottom: 10),
-                            child: _LinkCard(
-                              link: link,
-                              onTap: () => unawaited(_openLink(link)),
-                              onDelete: () => unawaited(_confirmDelete(link)),
-                            ),
+                            child: _buildOfflineDismissibleCard(link),
                           ),
                         ),
                       if (linkState.refreshing) ...[
@@ -197,9 +201,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('删除连接'),
-        content: Text('确定要删除与「${link.hostName ?? '该主机'}」的配对记录吗？\n两端的配对信息都将被清除。'),
+        content: Text(
+          '确定要删除与「${link.hostName ?? '该主机'}」的配对记录吗？\n两端的配对信息都将被清除。',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -211,6 +220,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     if (confirmed == true && mounted) {
       await ref.read(linkNotifierProvider.notifier).deleteLink(link);
     }
+  }
+
+  Widget _buildOfflineDismissibleCard(ConnectionLink link) {
+    return Dismissible(
+      key: ValueKey('offline-${link.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除离线连接'),
+            content: Text(
+              '确定要删除与「${link.hostName ?? '该主机'}」的离线连接记录吗？\n两端的配对信息都将被清除。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) {
+          return false;
+        }
+        await ref.read(linkNotifierProvider.notifier).deleteLink(link);
+        return true;
+      },
+      background: Container(
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(Icons.delete_outline, color: Colors.red),
+            SizedBox(width: 6),
+            Text(
+              '删除',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+      child: _LinkCard(
+        link: link,
+        onTap: () => unawaited(_openLink(link)),
+        onDelete: () => unawaited(_confirmDelete(link)),
+      ),
+    );
   }
 
   Widget _buildConnectionSummary(
@@ -258,7 +325,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 }
 
 class _LinkCard extends StatelessWidget {
-  const _LinkCard({required this.link, required this.onTap, required this.onDelete});
+  const _LinkCard({
+    required this.link,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   final ConnectionLink link;
   final VoidCallback onTap;
@@ -266,9 +337,13 @@ class _LinkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final online    = link.status == LinkStatus.online;
-    final hostName  = (link.hostName ?? '').trim().isEmpty ? '未命名主机' : link.hostName!;
-    final ds        = link.desktopStatus;
+    final online = link.status == LinkStatus.online;
+    final hostName = (link.hostName ?? '').trim().isEmpty
+        ? '未命名主机'
+        : link.hostName!;
+    final ds = link.desktopStatus;
+    final desktopPlatform = (link.desktopPlatform ?? ds?.platform ?? '').trim();
+    final mobilePlatform = (link.mobilePlatform ?? '').trim();
 
     return Material(
       color: Colors.white,
@@ -297,20 +372,42 @@ class _LinkCard extends StatelessWidget {
                           hostName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           link.cliType.value,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   _StatusBadge(online: online),
                 ],
+              ),
+              const SizedBox(height: 10),
+              const Divider(height: 1, color: Color(0xFFEEEEEE)),
+              const SizedBox(height: 8),
+              _IdAndPlatformRow(
+                icon: Icons.computer_outlined,
+                title: '主机',
+                idValue: link.desktopDeviceId,
+                platformValue: desktopPlatform,
+              ),
+              const SizedBox(height: 6),
+              _IdAndPlatformRow(
+                icon: Icons.phone_android_outlined,
+                title: '移动端',
+                idValue: link.mobileDeviceId,
+                platformValue: mobilePlatform,
               ),
               // Desktop health status (if available)
               if (ds != null) ...[
@@ -323,6 +420,47 @@ class _LinkCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _IdAndPlatformRow extends StatelessWidget {
+  const _IdAndPlatformRow({
+    required this.icon,
+    required this.title,
+    required this.idValue,
+    required this.platformValue,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? idValue;
+  final String? platformValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final idText = (idValue ?? '').trim().isEmpty ? '—' : idValue!;
+    final platformText = (platformValue ?? '').trim().isEmpty
+        ? '未知'
+        : platformValue!;
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.black45),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '$title ID: $idText',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '系统: $platformText',
+          style: const TextStyle(fontSize: 12, color: Colors.black87),
+        ),
+      ],
     );
   }
 }
@@ -369,7 +507,7 @@ class _DesktopHealthRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final claudeOk   = status.claudeStatus   == 'running';
+    final claudeOk = status.claudeStatus == 'running';
     final terminalOk = status.terminalStatus == 'running';
     return Row(
       children: [
@@ -377,7 +515,11 @@ class _DesktopHealthRow extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           '主机状态: ${status.overallStatus.label}',
-          style: TextStyle(fontSize: 12, color: _healthColor, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 12,
+            color: _healthColor,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         const Spacer(),
         _ServiceDot(label: 'Claude', ok: claudeOk),
@@ -407,7 +549,10 @@ class _ServiceDot extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Colors.black54),
+        ),
       ],
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -6,6 +7,30 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../models/claude_prompt_model.dart';
 import '../models/session_model.dart';
 import '../utils/app_logger.dart';
+
+String normalizeSystemPlatform(String? value) {
+  switch ((value ?? '').toLowerCase()) {
+    case 'darwin':
+    case 'macos':
+      return 'macOS';
+    case 'win32':
+    case 'windows':
+      return 'Windows';
+    case 'linux':
+      return 'Linux';
+    case 'ios':
+      return 'iOS';
+    case 'android':
+      return 'Android';
+    default:
+      return (value ?? '').trim();
+  }
+}
+
+String currentMobilePlatform() {
+  if (kIsWeb) return 'Web';
+  return normalizeSystemPlatform(Platform.operatingSystem);
+}
 
 /// Manages the Socket.IO connection to the relay server and exposes typed
 /// streams for all inbound events, as well as methods for all outbound events.
@@ -47,7 +72,8 @@ class SocketService {
   Stream<TerminalOutput> get terminalOutput => _terminalOutputController.stream;
 
   /// Complete terminal state snapshots from the server.
-  Stream<TerminalSnapshot> get terminalSnapshot => _terminalSnapshotController.stream;
+  Stream<TerminalSnapshot> get terminalSnapshot =>
+      _terminalSnapshotController.stream;
 
   /// Interactive Claude prompts detected by the host agent.
   Stream<ClaudePrompt> get claudePrompts => _claudePromptsController.stream;
@@ -82,6 +108,7 @@ class SocketService {
   // ---------------------------------------------------------------------------
 
   bool get isConnected => _socket?.connected ?? false;
+  String get mobilePlatform => currentMobilePlatform();
 
   /// Establishes a Socket.IO connection to [serverUrl] and immediately emits
   /// the `mobile:join` event with the supplied credentials.
@@ -203,7 +230,11 @@ class SocketService {
       _connectionStatusController.add(SocketConnectionStatus.connected);
 
       // Emit join immediately upon (re)connection.
-      socket.emit('mobile:join', {'sessionToken': token, 'deviceId': deviceId});
+      socket.emit('mobile:join', {
+        'sessionToken': token,
+        'deviceId': deviceId,
+        'mobilePlatform': mobilePlatform,
+      });
       AppLogger.info('SocketService', '已发送 mobile:join');
 
       if (_pendingRuntimeCliType != null) {
@@ -262,7 +293,10 @@ class SocketService {
           final seq = (map['seq'] as num?)?.toInt();
           final dataStr = map['data'] as String? ?? '';
           if (seq != null && seq % 50 == 0) {
-            AppLogger.info('SocketService', '收到 terminal:output seq=$seq bytes=${dataStr.length}');
+            AppLogger.info(
+              'SocketService',
+              '收到 terminal:output seq=$seq bytes=${dataStr.length}',
+            );
           }
           _terminalOutputController.add(TerminalOutput.fromJson(map));
         }
@@ -280,7 +314,10 @@ class SocketService {
         final map = _toMap(data);
         if (map != null) {
           final snapshot = map['snapshot'] as String? ?? '';
-          AppLogger.info('SocketService', '收到 terminal:snapshot bytes=${snapshot.length}');
+          AppLogger.info(
+            'SocketService',
+            '收到 terminal:snapshot bytes=${snapshot.length}',
+          );
           _terminalSnapshotController.add(TerminalSnapshot.fromJson(map));
         }
       } catch (e) {
@@ -296,7 +333,10 @@ class SocketService {
       try {
         final map = _toMap(data);
         if (map != null) {
-          AppLogger.info('SocketService', '收到 claude:prompt type=${map['promptType']}');
+          AppLogger.info(
+            'SocketService',
+            '收到 claude:prompt type=${map['promptType']}',
+          );
           _claudePromptsController.add(ClaudePrompt.fromJson(map));
         }
       } catch (e) {
@@ -312,7 +352,10 @@ class SocketService {
       try {
         final map = _toMap(data);
         if (map != null) {
-          AppLogger.info('SocketService', '收到 session:state state=${map['state']}');
+          AppLogger.info(
+            'SocketService',
+            '收到 session:state state=${map['state']}',
+          );
           _sessionStatesController.add(SessionStateEvent.fromJson(map));
         }
       } catch (e) {
@@ -361,7 +404,10 @@ class SocketService {
       try {
         final map = _toMap(data);
         if (map != null) {
-          AppLogger.info('SocketService', '收到 runtime:status ready=${map['ready']}');
+          AppLogger.info(
+            'SocketService',
+            '收到 runtime:status ready=${map['ready']}',
+          );
           _runtimeStatusController.add(RuntimeStatusEvent.fromJson(map));
         }
       } catch (e) {

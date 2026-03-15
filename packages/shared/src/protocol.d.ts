@@ -40,6 +40,7 @@ export interface MobileJoinPayload {
     sessionToken: string;
     deviceId: string;
     mobileDeviceId?: string;
+    mobilePlatform?: string;
 }
 /** Reconnect with a previously-issued token — no QR scan needed */
 export interface SessionResumePayload {
@@ -97,6 +98,8 @@ export interface SessionStatePayload {
 export interface SessionPairPayload {
     sessionId: string;
     mobileDeviceId: string;
+    agentPlatform?: string | null;
+    mobilePlatform?: string | null;
     pairedAt: number;
 }
 export interface ClaudePromptPayload {

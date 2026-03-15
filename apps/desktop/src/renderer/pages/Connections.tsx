@@ -15,7 +15,26 @@ function truncate(s: string, len = 16): string {
   return s.length > len ? s.slice(0, len) + '…' : s
 }
 
-function IdChip({ label, value }: { label: string; value: string }) {
+function formatPlatform(value?: string): string {
+  switch ((value ?? '').toLowerCase()) {
+    case 'darwin':
+    case 'macos':
+      return 'macOS'
+    case 'win32':
+    case 'windows':
+      return 'Windows'
+    case 'linux':
+      return 'Linux'
+    case 'ios':
+      return 'iOS'
+    case 'android':
+      return 'Android'
+    default:
+      return value?.trim() || '未知'
+  }
+}
+
+function IdChip({ label, value, platform }: { label: string; value: string; platform?: string }) {
   const [copied, setCopied] = useState(false)
   const [hovered, setHovered] = useState(false)
   const copy = useCallback(() => {
@@ -65,7 +84,6 @@ function IdChip({ label, value }: { label: string; value: string }) {
               fontSize: 11,
               padding: '6px 10px',
               borderRadius: 6,
-              whiteSpace: 'pre',
               zIndex: 100,
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
               pointerEvents: 'none',
@@ -88,6 +106,9 @@ function IdChip({ label, value }: { label: string; value: string }) {
           </div>
         )}
       </div>
+      <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 4 }}>
+        系统: {formatPlatform(platform)}
+      </span>
     </div>
   )
 }
@@ -135,8 +156,8 @@ function ConnectionCard({ record, onDelete }: { record: PairedSessionRecord; onD
       {/* ID rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <IdChip label="会话 ID" value={record.connectionKey} />
-        <IdChip label="主机 ID" value={record.desktopDeviceId} />
-        <IdChip label="手机 ID" value={record.mobileDeviceId} />
+        <IdChip label="主机 ID" value={record.desktopDeviceId} platform={record.desktopPlatform} />
+        <IdChip label="手机 ID" value={record.mobileDeviceId} platform={record.mobilePlatform} />
       </div>
 
       {/* Bottom row: server + pairedAt + delete */}

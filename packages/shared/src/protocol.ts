@@ -63,6 +63,7 @@ export interface MobileJoinPayload {
   sessionToken:    string;
   deviceId:        string;  // Mobile stable device ID
   mobileDeviceId?: string;  // alias for deviceId (preferred name)
+  mobilePlatform?: string;
 }
 
 /** Reconnect with a previously-issued token — no QR scan needed */
@@ -129,6 +130,8 @@ export interface SessionStatePayload {
 export interface SessionPairPayload {
   sessionId: string;
   mobileDeviceId: string;
+  agentPlatform?: string | null;
+  mobilePlatform?: string | null;
   pairedAt: number;
 }
 

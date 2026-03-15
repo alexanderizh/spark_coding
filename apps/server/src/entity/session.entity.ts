@@ -58,6 +58,9 @@ export class Session {
   @Column({ type: 'varchar', nullable: true, name: 'agent_platform', length: 32 })
   agentPlatform!: string | null;
 
+  @Column({ type: 'varchar', nullable: true, name: 'mobile_platform', length: 32 })
+  mobilePlatform!: string | null;
+
   @Column({ type: 'varchar', nullable: true, name: 'agent_hostname', length: 128 })
   agentHostname!: string | null;
 

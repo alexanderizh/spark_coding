@@ -72,6 +72,7 @@ export class SessionService {
       agentSocketId:   null,
       mobileSocketId:  null,
       agentPlatform:   null,
+      mobilePlatform:  null,
       agentHostname:   null,
       pairedAt:        null,
       lastActivityAt:  now,
@@ -129,6 +130,13 @@ export class SessionService {
     });
   }
 
+  async findByDesktopDeviceId(desktopDeviceId: string): Promise<Session[]> {
+    return this.sessionRepo.find({
+      where: { desktopDeviceId },
+      order: { lastActivityAt: 'DESC' },
+    });
+  }
+
   /**
    * Find sessions that have an active agent socket for the given desktop device IDs.
    * Used to surface newly-started desktop sessions that haven't been re-paired yet.
@@ -153,6 +161,7 @@ export class SessionService {
       | 'agentSocketId'
       | 'mobileSocketId'
       | 'agentPlatform'
+      | 'mobilePlatform'
       | 'agentHostname'
       | 'mobileDeviceId'
       | 'desktopDeviceId'

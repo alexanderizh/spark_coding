@@ -49,10 +49,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   bool _isTyping = false;
   bool _runtimeEnsuring = false;
 
-  // Cache notifier reference so it can be safely used in dispose()
-  // (ref.read() may throw after widget is unmounted in some Riverpod versions)
-  late final ConnectionNotifier _connectionNotifier;
-
   @override
   void initState() {
     super.initState();
@@ -61,7 +57,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _terminal.onResize = (cols, rows, pixelWidth, pixelHeight) {
       socketService.sendResize(cols, rows);
     };
-    _connectionNotifier = ref.read(connectionNotifierProvider.notifier);
     _listenForErrors();
     _listenForSnapshot();
     _listenForPrompts();
@@ -79,8 +74,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _snapshotSub?.cancel();
     _promptSub?.cancel();
     _runtimeSub?.cancel();
-    // Disconnect socket when leaving terminal so the next _openLink() can reconnect cleanly.
-    _connectionNotifier.disconnect();
     super.dispose();
   }
 
@@ -653,7 +646,7 @@ class _ReconnectBannerState extends State<_ReconnectBanner> {
       color: widget.isError ? const Color(0xFFE57373) : const Color(0xFFFFD54F),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             widget.isError ? Icons.error_outline : Icons.wifi_off,

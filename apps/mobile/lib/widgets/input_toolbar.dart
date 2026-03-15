@@ -14,6 +14,7 @@ class InputToolbar extends StatefulWidget {
 
   final MessageCallback onSendMessage;
   final ValueChanged<bool>? onTypingChanged;
+
   /// Sends a raw terminal sequence (no \r appended).
   final RawInputCallback? onRawInput;
 
@@ -42,13 +43,13 @@ class _InputToolbarState extends State<InputToolbar> {
 
   // Key shortcuts: label → raw terminal sequence
   static const _keyShortcuts = <({String label, String seq, IconData? icon})>[
-    (label: 'Esc', seq: '\x1b',   icon: null),
-    (label: '↑',   seq: '\x1b[A', icon: null),
-    (label: '↓',   seq: '\x1b[B', icon: null),
-    (label: '←',   seq: '\x1b[D', icon: null),
-    (label: '→',   seq: '\x1b[C', icon: null),
-    (label: 'Tab', seq: '\t',     icon: null),
-    (label: '⏎',   seq: '\r',     icon: null),
+    (label: 'Esc', seq: '\x1b', icon: null),
+    (label: '↑', seq: '\x1b[A', icon: null),
+    (label: '↓', seq: '\x1b[B', icon: null),
+    (label: '←', seq: '\x1b[D', icon: null),
+    (label: '→', seq: '\x1b[C', icon: null),
+    (label: 'Tab', seq: '\t', icon: null),
+    (label: '回车', seq: '\r', icon: null),
   ];
 
   @override
@@ -78,7 +79,7 @@ class _InputToolbarState extends State<InputToolbar> {
     setState(() => _hasText = false);
     widget.onTypingChanged?.call(false);
     HapticFeedback.selectionClick();
-    _focusNode.requestFocus();
+    _focusNode.unfocus();
   }
 
   void _sendRaw(String seq) {
@@ -119,7 +120,9 @@ class _InputToolbarState extends State<InputToolbar> {
                     ),
                     ..._commands.map(
                       (item) => ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                        ),
                         title: Text(
                           item.title,
                           style: const TextStyle(
@@ -154,7 +157,7 @@ class _InputToolbarState extends State<InputToolbar> {
     widget.onSendMessage(selected);
     widget.onTypingChanged?.call(false);
     await HapticFeedback.selectionClick();
-    _focusNode.requestFocus();
+    _focusNode.unfocus();
   }
 
   Widget _buildKeyBar() {

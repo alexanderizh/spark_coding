@@ -17565,7 +17565,12 @@ function SessionPage() {
     });
     const unQr = window.api.onQr((info) => setQrInfo(info));
     const unOutput = window.api.onOutput((data) => {
-      xtermRef.current?.write(data);
+      const term = xtermRef.current;
+      if (!term) return;
+      term.write(data, () => {
+        const snapshot = extractXtermViewport(term);
+        if (snapshot) window.api.reportXtermSnapshot(snapshot);
+      });
     });
     const unExit = window.api.onClaudeExit((code) => {
       xtermRef.current?.write(`\r
@@ -17676,6 +17681,18 @@ function statusLabel(s15) {
     stopped: "已停止"
   };
   return map[s15] ?? s15;
+}
+function extractXtermViewport(term) {
+  const buffer = term.buffer.active;
+  const lines = [];
+  const start = buffer.viewportY;
+  const end = start + term.rows;
+  for (let i = start; i < end; i++) {
+    const line = buffer.getLine(i);
+    lines.push(line ? line.translateToString(true) : "");
+  }
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+  return lines.join("\n");
 }
 function formatDuration(ms2) {
   const s15 = Math.floor(ms2 / 1e3);
@@ -17828,7 +17845,25 @@ function formatTime(ts2) {
 function truncate(s15, len = 16) {
   return s15.length > len ? s15.slice(0, len) + "…" : s15;
 }
-function IdChip({ label, value }) {
+function formatPlatform(value) {
+  switch ((value ?? "").toLowerCase()) {
+    case "darwin":
+    case "macos":
+      return "macOS";
+    case "win32":
+    case "windows":
+      return "Windows";
+    case "linux":
+      return "Linux";
+    case "ios":
+      return "iOS";
+    case "android":
+      return "Android";
+    default:
+      return value?.trim() || "未知";
+  }
+}
+function IdChip({ label, value, platform }) {
   const [copied, setCopied] = reactExports.useState(false);
   const [hovered, setHovered] = reactExports.useState(false);
   const copy = reactExports.useCallback(() => {
@@ -17877,7 +17912,6 @@ function IdChip({ label, value }) {
             fontSize: 11,
             padding: "6px 10px",
             borderRadius: 6,
-            whiteSpace: "pre",
             zIndex: 100,
             boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
             pointerEvents: "none",
@@ -17903,6 +17937,10 @@ function IdChip({ label, value }) {
           ]
         }
       )
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: 11, color: "var(--text-secondary)", marginLeft: 4 }, children: [
+      "系统: ",
+      formatPlatform(platform)
     ] })
   ] });
 }
@@ -17945,8 +17983,8 @@ function ConnectionCard({ record, onDelete }) {
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "会话 ID", value: record.connectionKey }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "主机 ID", value: record.desktopDeviceId }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "手机 ID", value: record.mobileDeviceId })
+          /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "主机 ID", value: record.desktopDeviceId, platform: record.desktopPlatform }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "手机 ID", value: record.mobileDeviceId, platform: record.mobilePlatform })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 4, borderTop: "1px solid var(--border)" }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(

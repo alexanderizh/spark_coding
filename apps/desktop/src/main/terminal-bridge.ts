@@ -208,6 +208,9 @@ export class TerminalBridge extends EventEmitter {
     // ── Startup health check ─────────────────────────────────────────────
     const health = runHealthCheck(config.claudePath)
     const report = buildStatusReport(config.deviceId, health, this.appStartTime)
+    // Daemon 正在启动中，终端服务视为运行中（PTY 将在 pair 后创建）
+    report.terminalStatus = 'running'
+    if (report.overallStatus === 'offline') report.overallStatus = 'degraded'
     // Report via HTTP first (before WebSocket is up)
     await reportStatusToServer(config.serverUrl, report)
 
@@ -389,6 +392,8 @@ export class TerminalBridge extends EventEmitter {
           serverUrl:       this.config.serverUrl,
           desktopDeviceId: this.config.deviceId,
           mobileDeviceId:  payload.mobileDeviceId,
+          desktopPlatform: payload.agentPlatform ?? process.platform,
+          mobilePlatform:  payload.mobilePlatform ?? undefined,
           launchType:      'claude',
           hostname:        os.hostname(),
           pairedAt:        payload.pairedAt,
@@ -405,7 +410,11 @@ export class TerminalBridge extends EventEmitter {
     socket.on(Events.SESSION_STATE, (payload: SessionStatePayload) => {
       this.log('收到 session:state state=%s', payload.state)
       if (payload.state === SessionState.MOBILE_DISCONNECTED) {
-        this.setStatus('waiting', 'Mobile disconnected — Claude still running…')
+        this.log('Mobile 断开连接，终止 Claude 进程')
+        try { this.ptyProcess?.kill() } catch { /* ignore */ }
+        this.ptyProcess = undefined
+        this.isPaired = false
+        this.setStatus('waiting', 'Mobile disconnected — Claude stopped')
       }
       if (payload.state === SessionState.PAIRED && !this.isPaired) {
         this.isPaired = true

@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow, app, IpcMainEvent }    from 'electron'
 import { TerminalBridge, BridgeConfig }                  from './terminal-bridge'
-import { getSettings, saveSettings, getEffectiveServerUrl, AppSettings, getPairedSessions, removePairedSessionById } from './store'
+import { getSettings, saveSettings, getEffectiveServerUrl, AppSettings, PairedSessionRecord } from './store'
 import { detectClaudePath }                              from './claude-detector'
 import { getOrCreateDeviceId }                           from './device-id'
 import { runHealthCheck, buildStatusReport }             from './health-checker'
@@ -30,14 +30,22 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   // ── Paired sessions ───────────────────────────────────────────────────────
-  ipcMain.handle('session:listPaired', () => getPairedSessions())
+  ipcMain.handle('session:listPaired', async () => {
+    const serverUrl = getEffectiveServerUrl()
+    const desktopDeviceId = getOrCreateDeviceId()
+    if (!serverUrl) return []
+    try {
+      return await fetchDesktopSessionsFromServer(serverUrl, desktopDeviceId)
+    } catch (_) {
+      return []
+    }
+  })
 
   ipcMain.handle('session:delete', async (_e, sessionId: string, serverUrl: string) => {
-    removePairedSessionById(sessionId)
     try {
       await fetch(`${serverUrl}/api/session/${sessionId}`, { method: 'DELETE' })
     } catch (_) {
-      // server may be unreachable; local removal is sufficient
+      // ignore
     }
     return { ok: true }
   })
@@ -116,6 +124,48 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('xterm:snapshot', (_e: IpcMainEvent, snapshot: string) => {
     bridge?.setXtermSnapshot(snapshot)
   })
+}
+
+async function fetchDesktopSessionsFromServer(serverUrl: string, desktopDeviceId: string): Promise<PairedSessionRecord[]> {
+  const response = await fetch(
+    `${serverUrl}/api/sessions/desktop?desktopDeviceId=${encodeURIComponent(desktopDeviceId)}`
+  )
+  if (!response.ok) return []
+  const result = await response.json() as {
+    success?: boolean
+    data?: Array<{
+      sessionId: string
+      connectionKey?: string | null
+      token?: string | null
+      agentHostname?: string | null
+      agentPlatform?: string | null
+      mobilePlatform?: string | null
+      desktopDeviceId?: string | null
+      mobileDeviceId?: string | null
+      launchType?: string | null
+      pairedAt?: number | null
+      lastActiveAt?: number
+      desktopStatus?: { platform?: string | null } | null
+    }>
+  }
+
+  if (!result.success || !Array.isArray(result.data)) return []
+
+  return result.data.map((item) => ({
+    connectionKey: item.connectionKey
+      ?? `${item.sessionId}_${item.mobileDeviceId ?? 'unknown'}_${item.launchType ?? 'claude'}`,
+    sessionId:       item.sessionId,
+    tokens:          item.token ? [item.token] : [],
+    serverUrl,
+    desktopDeviceId: item.desktopDeviceId ?? desktopDeviceId,
+    mobileDeviceId:  item.mobileDeviceId ?? 'unknown',
+    desktopPlatform: item.agentPlatform ?? item.desktopStatus?.platform ?? undefined,
+    mobilePlatform:  item.mobilePlatform ?? undefined,
+    launchType:      item.launchType ?? 'claude',
+    hostname:        item.agentHostname ?? undefined,
+    pairedAt:        item.pairedAt ?? item.lastActiveAt ?? Date.now(),
+    lastUsedAt:      item.lastActiveAt ?? Date.now(),
+  }))
 }
 
 /**

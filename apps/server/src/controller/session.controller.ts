@@ -76,6 +76,8 @@ export class SessionController {
         agentConnected:  !!session.agentSocketId,
         mobileConnected: !!session.mobileSocketId,
         agentHostname:   session.agentHostname ?? null,
+        agentPlatform:   session.agentPlatform ?? null,
+        mobilePlatform:  session.mobilePlatform ?? null,
         desktopDeviceId: session.desktopDeviceId ?? null,
         mobileDeviceId:  session.mobileDeviceId ?? null,
         launchType:      session.launchType,
@@ -116,31 +118,19 @@ export class SessionController {
     const sessions = [...sessionMap.values()]
       .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
 
-    // Collect unique desktop device IDs
-    const desktopIds = [...new Set(
-      sessions.map(s => s.desktopDeviceId).filter(Boolean) as string[]
-    )];
+    const data = await this.buildSessionListData(sessions);
+    return { success: true, data };
+  }
 
-    // Batch-fetch desktop statuses
-    const statuses = await this.deviceService.listDesktopStatuses(desktopIds);
-    const statusMap = new Map(statuses.map(s => [s.deviceId, s]));
+  @Get('/sessions/desktop')
+  async listDesktopSessions(@Query('desktopDeviceId') desktopDeviceId: string) {
+    if (!desktopDeviceId) {
+      this.ctx.status = 400;
+      return { success: false, error: 'desktopDeviceId query param required' };
+    }
 
-    const data = sessions.map(s => ({
-      sessionId:       s.id,
-      connectionKey:   s.connectionKey,
-      token:           s.token,
-      state:           s.state,
-      agentConnected:  !!s.agentSocketId,
-      mobileConnected: !!s.mobileSocketId,
-      agentHostname:   s.agentHostname ?? null,
-      desktopDeviceId: s.desktopDeviceId ?? null,
-      mobileDeviceId:  s.mobileDeviceId ?? null,
-      launchType:      s.launchType,
-      pairedAt:        s.pairedAt?.getTime() ?? null,
-      lastActiveAt:    s.lastActivityAt.getTime(),
-      desktopStatus:   s.desktopDeviceId ? (statusMap.get(s.desktopDeviceId) ?? null) : null,
-    }));
-
+    const sessions = await this.sessionService.findByDesktopDeviceId(desktopDeviceId);
+    const data = await this.buildSessionListData(sessions);
     return { success: true, data };
   }
 
@@ -237,5 +227,31 @@ export class SessionController {
     const host = this.ctx.request.headers['x-forwarded-host'] ?? this.ctx.host;
     const proto = this.ctx.request.headers['x-forwarded-proto'] ?? 'http';
     return `${proto}://${host}`;
+  }
+
+  private async buildSessionListData(sessions: Awaited<ReturnType<SessionService['findByMobileDeviceId']>>) {
+    const desktopIds = [...new Set(
+      sessions.map(s => s.desktopDeviceId).filter(Boolean) as string[]
+    )];
+    const statuses = await this.deviceService.listDesktopStatuses(desktopIds);
+    const statusMap = new Map(statuses.map(s => [s.deviceId, s]));
+
+    return sessions.map(s => ({
+      sessionId:       s.id,
+      connectionKey:   s.connectionKey,
+      token:           s.token,
+      state:           s.state,
+      agentConnected:  !!s.agentSocketId,
+      mobileConnected: !!s.mobileSocketId,
+      agentHostname:   s.agentHostname ?? null,
+      agentPlatform:   s.agentPlatform ?? null,
+      mobilePlatform:  s.mobilePlatform ?? null,
+      desktopDeviceId: s.desktopDeviceId ?? null,
+      mobileDeviceId:  s.mobileDeviceId ?? null,
+      launchType:      s.launchType,
+      pairedAt:        s.pairedAt?.getTime() ?? null,
+      lastActiveAt:    s.lastActivityAt.getTime(),
+      desktopStatus:   s.desktopDeviceId ? (statusMap.get(s.desktopDeviceId) ?? null) : null,
+    }));
   }
 }

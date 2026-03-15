@@ -98,30 +98,35 @@ class DesktopStatusSnapshot {
     required this.terminalStatus,
     this.claudePath,
     this.appVersion,
+    this.platform,
     this.uptimeMs,
     this.reportedAt,
     this.updatedAt,
   });
 
   final DesktopHealth overallStatus;
-  final String claudeStatus;   // 'running' | 'stopped' | 'error' | 'unknown'
+  final String claudeStatus; // 'running' | 'stopped' | 'error' | 'unknown'
   final String terminalStatus; // same
   final String? claudePath;
   final String? appVersion;
+  final String? platform;
   final int? uptimeMs;
   final int? reportedAt;
   final int? updatedAt;
 
   factory DesktopStatusSnapshot.fromJson(Map<String, dynamic> json) {
     return DesktopStatusSnapshot(
-      overallStatus:  DesktopHealthValue.fromString(json['overallStatus'] as String?),
-      claudeStatus:   json['claudeStatus']  as String? ?? 'unknown',
+      overallStatus: DesktopHealthValue.fromString(
+        json['overallStatus'] as String?,
+      ),
+      claudeStatus: json['claudeStatus'] as String? ?? 'unknown',
       terminalStatus: json['terminalStatus'] as String? ?? 'unknown',
-      claudePath:     json['claudePath']    as String?,
-      appVersion:     json['appVersion']    as String?,
-      uptimeMs:       json['uptimeMs']      as int?,
-      reportedAt:     json['reportedAt']    as int?,
-      updatedAt:      json['updatedAt']     as int?,
+      claudePath: json['claudePath'] as String?,
+      appVersion: json['appVersion'] as String?,
+      platform: json['platform'] as String?,
+      uptimeMs: json['uptimeMs'] as int?,
+      reportedAt: json['reportedAt'] as int?,
+      updatedAt: json['updatedAt'] as int?,
     );
   }
 }
@@ -138,6 +143,8 @@ class ConnectionLink {
     this.hostName,
     this.desktopDeviceId,
     this.mobileDeviceId,
+    this.desktopPlatform,
+    this.mobilePlatform,
     this.desktopStatus,
     this.status = LinkStatus.unknown,
     this.lastCheckedAt,
@@ -149,14 +156,20 @@ class ConnectionLink {
   final String serverUrl;
   final String token;
   final String sessionId;
+
   /// Stable connection key: ${desktopFp}_${mobileFp}_${launchType}
   final String? connectionKey;
   final CliType cliType;
   final String? hostName;
+
   /// Desktop physical fingerprint (for status polling)
   final String? desktopDeviceId;
+
   /// Mobile physical device ID
   final String? mobileDeviceId;
+  final String? desktopPlatform;
+  final String? mobilePlatform;
+
   /// Latest desktop health status from server cache
   final DesktopStatusSnapshot? desktopStatus;
   final LinkStatus status;
@@ -174,6 +187,8 @@ class ConnectionLink {
     String? hostName,
     String? desktopDeviceId,
     String? mobileDeviceId,
+    String? desktopPlatform,
+    String? mobilePlatform,
     DesktopStatusSnapshot? desktopStatus,
     LinkStatus? status,
     int? lastCheckedAt,
@@ -181,53 +196,59 @@ class ConnectionLink {
     int? updatedAt,
   }) {
     return ConnectionLink(
-      id:              id              ?? this.id,
-      serverUrl:       serverUrl       ?? this.serverUrl,
-      token:           token           ?? this.token,
-      sessionId:       sessionId       ?? this.sessionId,
-      connectionKey:   connectionKey   ?? this.connectionKey,
-      cliType:         cliType         ?? this.cliType,
-      hostName:        hostName        ?? this.hostName,
+      id: id ?? this.id,
+      serverUrl: serverUrl ?? this.serverUrl,
+      token: token ?? this.token,
+      sessionId: sessionId ?? this.sessionId,
+      connectionKey: connectionKey ?? this.connectionKey,
+      cliType: cliType ?? this.cliType,
+      hostName: hostName ?? this.hostName,
       desktopDeviceId: desktopDeviceId ?? this.desktopDeviceId,
-      mobileDeviceId:  mobileDeviceId  ?? this.mobileDeviceId,
-      desktopStatus:   desktopStatus   ?? this.desktopStatus,
-      status:          status          ?? this.status,
-      lastCheckedAt:   lastCheckedAt   ?? this.lastCheckedAt,
-      createdAt:       createdAt       ?? this.createdAt,
-      updatedAt:       updatedAt       ?? this.updatedAt,
+      mobileDeviceId: mobileDeviceId ?? this.mobileDeviceId,
+      desktopPlatform: desktopPlatform ?? this.desktopPlatform,
+      mobilePlatform: mobilePlatform ?? this.mobilePlatform,
+      desktopStatus: desktopStatus ?? this.desktopStatus,
+      status: status ?? this.status,
+      lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id':              id,
-    'serverUrl':       serverUrl,
-    'token':           token,
-    'sessionId':       sessionId,
-    'connectionKey':   connectionKey,
-    'cliType':         cliType.value,
-    'hostName':        hostName,
+    'id': id,
+    'serverUrl': serverUrl,
+    'token': token,
+    'sessionId': sessionId,
+    'connectionKey': connectionKey,
+    'cliType': cliType.value,
+    'hostName': hostName,
     'desktopDeviceId': desktopDeviceId,
-    'mobileDeviceId':  mobileDeviceId,
+    'mobileDeviceId': mobileDeviceId,
+    'desktopPlatform': desktopPlatform,
+    'mobilePlatform': mobilePlatform,
     // desktopStatus is transient — not persisted
-    'status':          status.value,
-    'lastCheckedAt':   lastCheckedAt,
-    'createdAt':       createdAt,
-    'updatedAt':       updatedAt,
+    'status': status.value,
+    'lastCheckedAt': lastCheckedAt,
+    'createdAt': createdAt,
+    'updatedAt': updatedAt,
   };
 
   factory ConnectionLink.fromJson(Map<String, dynamic> json) {
     return ConnectionLink(
-      id:              json['id']              as String,
-      serverUrl:       json['serverUrl']       as String,
-      token:           json['token']           as String,
-      sessionId:       json['sessionId']       as String,
-      connectionKey:   json['connectionKey']   as String?,
-      cliType:         CliTypeValue.fromString(
+      id: json['id'] as String,
+      serverUrl: json['serverUrl'] as String,
+      token: json['token'] as String,
+      sessionId: json['sessionId'] as String,
+      connectionKey: json['connectionKey'] as String?,
+      cliType: CliTypeValue.fromString(
         json['cliType'] as String? ?? CliType.claude.value,
       ),
-      hostName:        json['hostName']        as String?,
+      hostName: json['hostName'] as String?,
       desktopDeviceId: json['desktopDeviceId'] as String?,
-      mobileDeviceId:  json['mobileDeviceId']  as String?,
+      mobileDeviceId: json['mobileDeviceId'] as String?,
+      desktopPlatform: json['desktopPlatform'] as String?,
+      mobilePlatform: json['mobilePlatform'] as String?,
       // desktopStatus is transient — rebuilt on refresh
       status: LinkStatusValue.fromString(
         json['status'] as String? ?? LinkStatus.unknown.value,

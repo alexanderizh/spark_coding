@@ -28,20 +28,23 @@ class LinkListState {
     String? errorMessage,
   }) {
     return LinkListState(
-      links:        links        ?? this.links,
+      links: links ?? this.links,
       initializing: initializing ?? this.initializing,
-      refreshing:   refreshing   ?? this.refreshing,
+      refreshing: refreshing ?? this.refreshing,
       errorMessage: errorMessage,
     );
   }
 }
 
 class LinkNotifier extends StateNotifier<LinkListState> {
-  LinkNotifier({required SessionService sessionService, required SocketService socketService, Dio? dio})
-    : _sessionService = sessionService,
-      _socketService = socketService,
-      _dio = dio ?? Dio(),
-      super(const LinkListState());
+  LinkNotifier({
+    required SessionService sessionService,
+    required SocketService socketService,
+    Dio? dio,
+  }) : _sessionService = sessionService,
+       _socketService = socketService,
+       _dio = dio ?? Dio(),
+       super(const LinkListState());
 
   final SessionService _sessionService;
   final SocketService _socketService;
@@ -50,7 +53,7 @@ class LinkNotifier extends StateNotifier<LinkListState> {
   Future<void> init() async {
     await _sessionService.restore();
     state = state.copyWith(
-      links:        _sessionService.links,
+      links: _sessionService.links,
       initializing: false,
       errorMessage: null,
     );
@@ -59,160 +62,140 @@ class LinkNotifier extends StateNotifier<LinkListState> {
 
   /// Refresh session list using the server's `/api/sessions?mobileDeviceId=xxx`
   /// endpoint, which returns all paired sessions for this device together with
-  /// cached desktop status snapshots.  Falls back to per-session polling if the
-  /// mobileDeviceId is unavailable.
+  /// cached desktop status snapshots.
   Future<void> refreshStatus() async {
     final currentLinks = _sessionService.links;
     state = state.copyWith(
-      links:        currentLinks,
-      refreshing:   true,
+      links: currentLinks,
+      refreshing: true,
       initializing: false,
       errorMessage: null,
     );
 
     final mobileDeviceId = _sessionService.deviceId;
     final now = DateTime.now().millisecondsSinceEpoch;
-
-    // ── Strategy 1: bulk fetch from server ─────────────────────────────────
-    if (mobileDeviceId != null && currentLinks.isNotEmpty) {
-      // Collect known desktop device IDs so the server can surface newly-started
-      // desktop sessions that haven't been re-paired with this mobile yet.
-      final knownDesktopIds = currentLinks
-          .map((l) => l.desktopDeviceId)
-          .whereType<String>()
-          .toSet()
-          .toList();
-
-      // Group links by serverUrl to batch requests
-      final serverUrls = currentLinks.map((l) => l.serverUrl).toSet();
-
-      // Lookup maps (priority order):
-      //   bySessionId      — primary: UUID is stable after first pairing
-      //   byConnectionKey  — fallback: if session was re-created before this fix
-      //   byDesktopDeviceId — last resort: catches active desktop with no match yet
-      final bySessionId       = <String, Map<String, dynamic>>{};
-      final byConnectionKey   = <String, Map<String, dynamic>>{};
-      final byDesktopDeviceId = <String, Map<String, dynamic>>{};
-
-      for (final serverUrl in serverUrls) {
-        try {
-          final queryParams = <String, dynamic>{'mobileDeviceId': mobileDeviceId};
-          if (knownDesktopIds.isNotEmpty) {
-            queryParams['desktopDeviceIds'] = knownDesktopIds.join(',');
-          }
-          final response = await _dio.get<Map<String, dynamic>>(
-            '$serverUrl/api/sessions',
-            queryParameters: queryParams,
-          );
-          final data = response.data?['data'] as List<dynamic>?;
-          if (data != null) {
-            for (final item in data) {
-              if (item is Map<String, dynamic>) {
-                final sid = item['sessionId']       as String?;
-                final ck  = item['connectionKey']   as String?;
-                final did = item['desktopDeviceId'] as String?;
-                final agentOn = item['agentConnected'] as bool? ?? false;
-                if (sid != null && sid.isNotEmpty) bySessionId[sid]     = item;
-                if (ck  != null && ck.isNotEmpty)  byConnectionKey[ck]  = item;
-                if (did != null && did.isNotEmpty && agentOn) byDesktopDeviceId[did] = item;
-              }
-            }
-          }
-        } catch (_) {
-          // Server unreachable — fall through to per-link polling
-        }
-      }
-
-      if (bySessionId.isNotEmpty || byConnectionKey.isNotEmpty || byDesktopDeviceId.isNotEmpty) {
-        final refreshed = currentLinks.map((link) {
-          // Priority: sessionId (stable UUID) → connectionKey → desktopDeviceId
-          final serverData = bySessionId[link.sessionId]
-                          ?? (link.connectionKey   != null ? byConnectionKey[link.connectionKey!]      : null)
-                          ?? (link.desktopDeviceId != null ? byDesktopDeviceId[link.desktopDeviceId!] : null);
-
-          if (serverData == null) {
-            return link.copyWith(
-              status:        LinkStatus.offline,
-              lastCheckedAt: now,
-              updatedAt:     now,
-            );
-          }
-
-          // Sync fresh credentials — sessionId/token rotate when desktop restarts
-          final freshSessionId = serverData['sessionId'] as String? ?? link.sessionId;
-          final freshToken     = serverData['token']     as String? ?? link.token;
-          final agentConnected = serverData['agentConnected'] as bool? ?? false;
-          final hostName       = serverData['agentHostname']  as String?;
-          final connKey        = serverData['connectionKey']  as String?;
-          final desktopId      = serverData['desktopDeviceId'] as String?;
-          final mobileId       = serverData['mobileDeviceId']  as String?;
-
-          DesktopStatusSnapshot? desktopStatus;
-          final statusJson = serverData['desktopStatus'] as Map<String, dynamic>?;
-          if (statusJson != null) {
-            desktopStatus = DesktopStatusSnapshot.fromJson(statusJson);
-          }
-
-          final desktopHealthy = desktopStatus?.overallStatus == DesktopHealth.healthy ||
-                                 desktopStatus?.overallStatus == DesktopHealth.degraded;
-          final online = agentConnected || desktopHealthy;
-
-          return link.copyWith(
-            sessionId:       freshSessionId,
-            token:           freshToken,
-            status:          online ? LinkStatus.online : LinkStatus.offline,
-            hostName:        (hostName?.trim().isEmpty ?? true) ? link.hostName : hostName,
-            connectionKey:   connKey ?? link.connectionKey,
-            desktopDeviceId: desktopId ?? link.desktopDeviceId,
-            mobileDeviceId:  mobileId  ?? link.mobileDeviceId,
-            desktopStatus:   desktopStatus,
-            lastCheckedAt:   now,
-            updatedAt:       now,
-          );
-        }).toList();
-
-        await _sessionService.replaceLinks(refreshed);
-        state = state.copyWith(
-          links:      _sessionService.links,
-          refreshing: false,
-        );
-        return;
-      }
+    if (mobileDeviceId == null) {
+      state = state.copyWith(refreshing: false);
+      return;
     }
 
-    // ── Strategy 2: per-link polling (legacy / fallback) ──────────────────
+    final serverUrls = currentLinks.map((l) => l.serverUrl).toSet();
+    final configuredServerUrl = _sessionService.serverUrl;
+    if (configuredServerUrl != null && configuredServerUrl.isNotEmpty) {
+      serverUrls.add(configuredServerUrl);
+    }
+    if (serverUrls.isEmpty) {
+      await _sessionService.replaceLinks(const []);
+      state = state.copyWith(links: const [], refreshing: false);
+      return;
+    }
+
+    final knownDesktopIds = currentLinks
+        .map((l) => l.desktopDeviceId)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    final existingBySessionId = {
+      for (final link in currentLinks) link.sessionId: link,
+    };
+
     final refreshed = <ConnectionLink>[];
-    for (final link in currentLinks) {
+    for (final serverUrl in serverUrls) {
       try {
+        final queryParams = <String, dynamic>{'mobileDeviceId': mobileDeviceId};
+        if (knownDesktopIds.isNotEmpty) {
+          queryParams['desktopDeviceIds'] = knownDesktopIds.join(',');
+        }
+
         final response = await _dio.get<Map<String, dynamic>>(
-          '${link.serverUrl}/api/session/${link.token}',
+          '$serverUrl/api/sessions',
+          queryParameters: queryParams,
         );
-        final data = response.data?['data'] as Map<String, dynamic>?;
-        final online   = data?['agentConnected'] as bool? ?? false;
-        final hostName = data?['agentHostname']  as String?;
-        refreshed.add(
-          link.copyWith(
-            status: online ? LinkStatus.online : LinkStatus.offline,
-            hostName: (hostName?.trim().isEmpty ?? true) ? link.hostName : hostName,
-            lastCheckedAt: now,
-            updatedAt:     now,
-          ),
-        );
+        final data = response.data?['data'] as List<dynamic>?;
+        if (data == null) continue;
+
+        for (final item in data) {
+          if (item is! Map<String, dynamic>) continue;
+          final sessionId = item['sessionId'] as String?;
+          final token = item['token'] as String?;
+          if (sessionId == null ||
+              sessionId.isEmpty ||
+              token == null ||
+              token.isEmpty) {
+            continue;
+          }
+
+          final previous = existingBySessionId[sessionId];
+          refreshed.add(
+            _buildLinkFromServer(
+              previous: previous,
+              serverData: item,
+              serverUrl: serverUrl,
+              now: now,
+            ),
+          );
+        }
       } catch (_) {
-        refreshed.add(
-          link.copyWith(
-            status:        LinkStatus.offline,
-            lastCheckedAt: now,
-            updatedAt:     now,
-          ),
-        );
+        // ignore
       }
     }
 
     await _sessionService.replaceLinks(refreshed);
-    state = state.copyWith(
-      links:      _sessionService.links,
-      refreshing: false,
+    state = state.copyWith(links: _sessionService.links, refreshing: false);
+  }
+
+  ConnectionLink _buildLinkFromServer({
+    required String serverUrl,
+    required Map<String, dynamic> serverData,
+    required int now,
+    ConnectionLink? previous,
+  }) {
+    final sessionId = serverData['sessionId'] as String;
+    final token = serverData['token'] as String;
+    final hostName = serverData['agentHostname'] as String?;
+    final connKey = serverData['connectionKey'] as String?;
+    final desktopId = serverData['desktopDeviceId'] as String?;
+    final mobileId = serverData['mobileDeviceId'] as String?;
+    final agentConnected = serverData['agentConnected'] as bool? ?? false;
+    final agentPlatform = normalizeSystemPlatform(
+      serverData['agentPlatform'] as String?,
+    );
+    final mobilePlatform = normalizeSystemPlatform(
+      serverData['mobilePlatform'] as String?,
+    );
+    DesktopStatusSnapshot? desktopStatus;
+    final statusJson = serverData['desktopStatus'] as Map<String, dynamic>?;
+    if (statusJson != null) {
+      desktopStatus = DesktopStatusSnapshot.fromJson(statusJson);
+    }
+    final desktopHealthy =
+        desktopStatus?.overallStatus == DesktopHealth.healthy ||
+        desktopStatus?.overallStatus == DesktopHealth.degraded;
+    final online = agentConnected || desktopHealthy;
+
+    return ConnectionLink(
+      id: previous?.id ?? (connKey?.isNotEmpty == true ? connKey! : sessionId),
+      serverUrl: serverUrl,
+      token: token,
+      sessionId: sessionId,
+      connectionKey: connKey ?? previous?.connectionKey,
+      cliType: CliType.claude,
+      hostName: (hostName?.trim().isEmpty ?? true)
+          ? previous?.hostName
+          : hostName,
+      desktopDeviceId: desktopId ?? previous?.desktopDeviceId,
+      mobileDeviceId: mobileId ?? previous?.mobileDeviceId,
+      desktopPlatform: agentPlatform.isEmpty
+          ? normalizeSystemPlatform(desktopStatus?.platform)
+          : agentPlatform,
+      mobilePlatform: mobilePlatform.isEmpty
+          ? (previous?.mobilePlatform ?? _socketService.mobilePlatform)
+          : mobilePlatform,
+      desktopStatus: desktopStatus,
+      status: online ? LinkStatus.online : LinkStatus.offline,
+      lastCheckedAt: now,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
     );
   }
 
@@ -224,13 +207,14 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     String? connectionKey,
   }) async {
     final saved = await _sessionService.saveOrUpdateLink(
-      serverUrl:       serverUrl,
-      token:           token,
-      sessionId:       sessionId,
-      cliType:         CliType.claude,
-      setActive:       true,
+      serverUrl: serverUrl,
+      token: token,
+      sessionId: sessionId,
+      cliType: CliType.claude,
+      setActive: true,
       desktopDeviceId: desktopDeviceId,
-      connectionKey:   connectionKey,
+      mobilePlatform: _socketService.mobilePlatform,
+      connectionKey: connectionKey,
     );
     state = state.copyWith(links: _sessionService.links, errorMessage: null);
     return saved;
@@ -244,9 +228,9 @@ class LinkNotifier extends StateNotifier<LinkListState> {
   Future<void> clearAllLinks() async {
     await _sessionService.clear();
     state = const LinkListState(
-      links:        [],
+      links: [],
       initializing: false,
-      refreshing:   false,
+      refreshing: false,
     );
   }
 
@@ -259,7 +243,9 @@ class LinkNotifier extends StateNotifier<LinkListState> {
 
     // Notify server (best-effort)
     try {
-      await _dio.delete('${link.serverUrl}/api/session/${link.sessionId}');
+      await _dio.delete<void>(
+        '${link.serverUrl}/api/session/${link.sessionId}',
+      );
     } catch (_) {
       // Server may already be gone; local removal is sufficient
     }
@@ -267,7 +253,9 @@ class LinkNotifier extends StateNotifier<LinkListState> {
 
   /// Called when server broadcasts session:deleted (deleted by desktop side).
   Future<void> handleSessionDeleted(String sessionId) async {
-    final matches = _sessionService.links.where((l) => l.sessionId == sessionId).toList();
+    final matches = _sessionService.links
+        .where((l) => l.sessionId == sessionId)
+        .toList();
     for (final link in matches) {
       await _sessionService.removeLink(link.id);
     }
@@ -281,7 +269,7 @@ final linkNotifierProvider = StateNotifierProvider<LinkNotifier, LinkListState>(
   (ref) {
     return LinkNotifier(
       sessionService: ref.watch(sessionServiceProvider),
-      socketService:  ref.watch(socketServiceProvider),
+      socketService: ref.watch(socketServiceProvider),
     );
   },
 );

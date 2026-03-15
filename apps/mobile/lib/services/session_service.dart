@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -26,8 +24,9 @@ class SessionService {
   final List<ConnectionLink> _links = [];
   String? _activeLinkId;
   String? _deviceId;
+  String? _lastServerUrl;
 
-  String? get serverUrl => activeLink?.serverUrl;
+  String? get serverUrl => activeLink?.serverUrl ?? _lastServerUrl;
   String? get token => activeLink?.token;
   String? get sessionId => activeLink?.sessionId;
   String? get deviceId => _deviceId;
@@ -52,42 +51,8 @@ class SessionService {
     final prefs = await SharedPreferences.getInstance();
 
     _links.clear();
-    _activeLinkId = prefs.getString(_Keys.activeLinkId);
-
-    final rawLinks = prefs.getString(_Keys.links);
-    if (rawLinks != null && rawLinks.isNotEmpty) {
-      final dynamic decoded = jsonDecode(rawLinks);
-      if (decoded is List) {
-        for (final item in decoded) {
-          if (item is Map) {
-            _links.add(
-              ConnectionLink.fromJson(Map<String, dynamic>.from(item)),
-            );
-          }
-        }
-      }
-    }
-
-    if (_links.isEmpty) {
-      final legacyServerUrl = prefs.getString(_Keys.serverUrl);
-      final legacyToken = prefs.getString(_Keys.token);
-      final legacySessionId = prefs.getString(_Keys.sessionId);
-      if (legacyServerUrl != null &&
-          legacyToken != null &&
-          legacySessionId != null) {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final migrated = ConnectionLink(
-          id: _uuid.v4(),
-          serverUrl: legacyServerUrl,
-          token: legacyToken,
-          sessionId: legacySessionId,
-          createdAt: now,
-          updatedAt: now,
-        );
-        _links.add(migrated);
-        _activeLinkId = migrated.id;
-      }
-    }
+    _activeLinkId = null;
+    _lastServerUrl = prefs.getString(_Keys.serverUrl);
 
     _deviceId = prefs.getString(_Keys.deviceId);
     if (_deviceId == null) {
@@ -124,19 +89,26 @@ class SessionService {
     CliType cliType = CliType.claude,
     String? hostName,
     String? desktopDeviceId,
+    String? desktopPlatform,
+    String? mobilePlatform,
     String? connectionKey,
     bool setActive = true,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+    _lastServerUrl = serverUrl;
     final normalizedHost = hostName?.trim();
     var targetIndex = -1;
 
     // Prefer matching by connectionKey (stable across token refreshes)
     if (connectionKey != null && connectionKey.isNotEmpty) {
-      targetIndex = _links.indexWhere((item) => item.connectionKey == connectionKey);
+      targetIndex = _links.indexWhere(
+        (item) => item.connectionKey == connectionKey,
+      );
     }
 
-    if (targetIndex < 0 && normalizedHost != null && normalizedHost.isNotEmpty) {
+    if (targetIndex < 0 &&
+        normalizedHost != null &&
+        normalizedHost.isNotEmpty) {
       targetIndex = _links.indexWhere(
         (item) =>
             (item.hostName ?? '').trim() == normalizedHost &&
@@ -163,19 +135,33 @@ class SessionService {
     }
 
     final link = ConnectionLink(
-      id:              targetIndex >= 0 ? _links[targetIndex].id : _uuid.v4(),
-      serverUrl:       serverUrl,
-      token:           token,
-      sessionId:       sessionId,
-      connectionKey:   connectionKey ?? (targetIndex >= 0 ? _links[targetIndex].connectionKey : null),
-      cliType:         cliType,
-      hostName:        normalizedHost,
-      desktopDeviceId: desktopDeviceId ?? (targetIndex >= 0 ? _links[targetIndex].desktopDeviceId : null),
-      mobileDeviceId:  _deviceId,
-      status:          targetIndex >= 0 ? _links[targetIndex].status : LinkStatus.unknown,
-      lastCheckedAt:   targetIndex >= 0 ? _links[targetIndex].lastCheckedAt : null,
-      createdAt:       targetIndex >= 0 ? _links[targetIndex].createdAt : now,
-      updatedAt:       now,
+      id: targetIndex >= 0 ? _links[targetIndex].id : _uuid.v4(),
+      serverUrl: serverUrl,
+      token: token,
+      sessionId: sessionId,
+      connectionKey:
+          connectionKey ??
+          (targetIndex >= 0 ? _links[targetIndex].connectionKey : null),
+      cliType: cliType,
+      hostName: normalizedHost,
+      desktopDeviceId:
+          desktopDeviceId ??
+          (targetIndex >= 0 ? _links[targetIndex].desktopDeviceId : null),
+      mobileDeviceId: _deviceId,
+      desktopPlatform:
+          desktopPlatform ??
+          (targetIndex >= 0 ? _links[targetIndex].desktopPlatform : null),
+      mobilePlatform:
+          mobilePlatform ??
+          (targetIndex >= 0 ? _links[targetIndex].mobilePlatform : null),
+      status: targetIndex >= 0
+          ? _links[targetIndex].status
+          : LinkStatus.unknown,
+      lastCheckedAt: targetIndex >= 0
+          ? _links[targetIndex].lastCheckedAt
+          : null,
+      createdAt: targetIndex >= 0 ? _links[targetIndex].createdAt : now,
+      updatedAt: now,
     );
 
     if (targetIndex >= 0) {
@@ -197,6 +183,9 @@ class SessionService {
     _links
       ..clear()
       ..addAll(links);
+    if (links.isNotEmpty) {
+      _lastServerUrl = links.first.serverUrl;
+    }
     await _dedupeByHostAndType();
     if (_activeLinkId != null &&
         !_links.any((link) => link.id == _activeLinkId)) {
@@ -240,6 +229,7 @@ class SessionService {
 
     _links.clear();
     _activeLinkId = null;
+    _lastServerUrl = null;
 
     await Future.wait([
       prefs.remove(_Keys.links),
@@ -318,27 +308,15 @@ class SessionService {
 
   Future<void> _persistLinks([SharedPreferences? prefs]) async {
     final storage = prefs ?? await SharedPreferences.getInstance();
-    final payload = jsonEncode(_links.map((item) => item.toJson()).toList());
-    await storage.setString(_Keys.links, payload);
-    if (_activeLinkId == null) {
-      await storage.remove(_Keys.activeLinkId);
-    } else {
-      await storage.setString(_Keys.activeLinkId, _activeLinkId!);
-    }
-    if (_links.isNotEmpty) {
-      final legacy = activeLink ?? _links.first;
-      await Future.wait([
-        storage.setString(_Keys.serverUrl, legacy.serverUrl),
-        storage.setString(_Keys.token, legacy.token),
-        storage.setString(_Keys.sessionId, legacy.sessionId),
-      ]);
-      _activeLinkId ??= legacy.id;
-    } else {
-      await Future.wait([
-        storage.remove(_Keys.serverUrl),
-        storage.remove(_Keys.token),
-        storage.remove(_Keys.sessionId),
-      ]);
-    }
+    final targetServerUrl = activeLink?.serverUrl ?? _lastServerUrl;
+    await Future.wait([
+      storage.remove(_Keys.links),
+      storage.remove(_Keys.activeLinkId),
+      storage.remove(_Keys.token),
+      storage.remove(_Keys.sessionId),
+      targetServerUrl == null
+          ? storage.remove(_Keys.serverUrl)
+          : storage.setString(_Keys.serverUrl, targetServerUrl),
+    ]);
   }
 }

@@ -43,6 +43,14 @@ alwaysApply: false
 ## 会话状态接口
 
 - `GET /api/session/:token` 若用于 mobile 连接列表展示，需返回 `agentHostname` 字段，卡片主标题优先使用该值。
+- 会话列表需要展示两端系统类型时，`GET /api/session/:token` 与 `GET /api/sessions` 均需返回 `agentPlatform` 与 `mobilePlatform` 字段。
+- `mobile:join` 需接收并写入 `mobilePlatform`（如 iOS/Android），`session:pair` 需携带两端平台字段，避免桌面端本地记录缺失系统类型。
+- 会话列表以云端数据库为准时，服务端需提供按 mobile 与按 desktop 的会话查询接口，客户端不得以本地缓存作为列表真值来源。
+
+## 会话删除一致性
+
+- 客户端刷新时应以数据库会话存在性为准：当接口返回 404/410（不存在或已过期）时，客户端应清理本地配对记录
+- `session:deleted` 属于实时同步优化，不能作为唯一清理手段，客户端需具备刷新时的兜底收敛逻辑
 
 ## TypeScript 严格模式
 

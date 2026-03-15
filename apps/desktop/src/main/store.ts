@@ -66,6 +66,8 @@ export interface PairedSessionRecord {
   serverUrl:       string
   desktopDeviceId: string
   mobileDeviceId:  string
+  desktopPlatform?: string
+  mobilePlatform?: string
   launchType:      string
   /** Desktop hostname at time of pairing */
   hostname?:       string

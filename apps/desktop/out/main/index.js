@@ -256,10 +256,6 @@ function updatePairedSessionLastUsed(connectionKey) {
     fs.writeFileSync(pairedSessionsPath(), JSON.stringify(all, null, 2), "utf8");
   }
 }
-function removePairedSessionById(sessionId) {
-  const all = getPairedSessions().filter((s) => s.sessionId !== sessionId);
-  fs.writeFileSync(pairedSessionsPath(), JSON.stringify(all, null, 2), "utf8");
-}
 const RELAY_LOG_PREFIX = "[relay][host]";
 const BATCH_INTERVAL_MS = 16;
 const RING_BUFFER_SIZE = 1024 * 1024;
@@ -363,6 +359,8 @@ class TerminalBridge extends events.EventEmitter {
     this.setStatus("connecting", `Connecting to ${config.serverUrl}…`);
     const health = runHealthCheck(config.claudePath);
     const report = buildStatusReport(config.deviceId, health, this.appStartTime);
+    report.terminalStatus = "running";
+    if (report.overallStatus === "offline") report.overallStatus = "degraded";
     await reportStatusToServer(config.serverUrl, report);
     let session;
     try {
@@ -525,6 +523,8 @@ class TerminalBridge extends events.EventEmitter {
           serverUrl: this.config.serverUrl,
           desktopDeviceId: this.config.deviceId,
           mobileDeviceId: payload.mobileDeviceId,
+          desktopPlatform: payload.agentPlatform ?? process.platform,
+          mobilePlatform: payload.mobilePlatform ?? void 0,
           launchType: "claude",
           hostname: os.hostname(),
           pairedAt: payload.pairedAt,
@@ -541,7 +541,14 @@ class TerminalBridge extends events.EventEmitter {
     socket.on(shared.Events.SESSION_STATE, (payload) => {
       this.log("收到 session:state state=%s", payload.state);
       if (payload.state === shared.SessionState.MOBILE_DISCONNECTED) {
-        this.setStatus("waiting", "Mobile disconnected — Claude still running…");
+        this.log("Mobile 断开连接，终止 Claude 进程");
+        try {
+          this.ptyProcess?.kill();
+        } catch {
+        }
+        this.ptyProcess = void 0;
+        this.isPaired = false;
+        this.setStatus("waiting", "Mobile disconnected — Claude stopped");
       }
       if (payload.state === shared.SessionState.PAIRED && !this.isPaired) {
         this.isPaired = true;
@@ -942,9 +949,17 @@ function setupIpc(getWindow) {
     }
     return report;
   });
-  electron.ipcMain.handle("session:listPaired", () => getPairedSessions());
+  electron.ipcMain.handle("session:listPaired", async () => {
+    const serverUrl = getEffectiveServerUrl();
+    const desktopDeviceId = getOrCreateDeviceId();
+    if (!serverUrl) return [];
+    try {
+      return await fetchDesktopSessionsFromServer(serverUrl, desktopDeviceId);
+    } catch (_) {
+      return [];
+    }
+  });
   electron.ipcMain.handle("session:delete", async (_e, sessionId, serverUrl) => {
-    removePairedSessionById(sessionId);
     try {
       await fetch(`${serverUrl}/api/session/${sessionId}`, { method: "DELETE" });
     } catch (_) {
@@ -1008,6 +1023,28 @@ function setupIpc(getWindow) {
   electron.ipcMain.on("xterm:snapshot", (_e, snapshot) => {
     bridge?.setXtermSnapshot(snapshot);
   });
+}
+async function fetchDesktopSessionsFromServer(serverUrl, desktopDeviceId) {
+  const response = await fetch(
+    `${serverUrl}/api/sessions/desktop?desktopDeviceId=${encodeURIComponent(desktopDeviceId)}`
+  );
+  if (!response.ok) return [];
+  const result = await response.json();
+  if (!result.success || !Array.isArray(result.data)) return [];
+  return result.data.map((item) => ({
+    connectionKey: item.connectionKey ?? `${item.sessionId}_${item.mobileDeviceId ?? "unknown"}_${item.launchType ?? "claude"}`,
+    sessionId: item.sessionId,
+    tokens: item.token ? [item.token] : [],
+    serverUrl,
+    desktopDeviceId: item.desktopDeviceId ?? desktopDeviceId,
+    mobileDeviceId: item.mobileDeviceId ?? "unknown",
+    desktopPlatform: item.agentPlatform ?? item.desktopStatus?.platform ?? void 0,
+    mobilePlatform: item.mobilePlatform ?? void 0,
+    launchType: item.launchType ?? "claude",
+    hostname: item.agentHostname ?? void 0,
+    pairedAt: item.pairedAt ?? item.lastActiveAt ?? Date.now(),
+    lastUsedAt: item.lastActiveAt ?? Date.now()
+  }));
 }
 function wireBridgeEvents(b, getWindow) {
   const send = (channel, payload) => {

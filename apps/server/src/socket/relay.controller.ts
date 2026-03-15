@@ -173,7 +173,14 @@ export class RelayController {
     const session = await this.sessionService.findById(meta.sessionId);
     if (!session) return;
 
-    if (session.agentSocketId && session.agentSocketId !== socket.id) {
+    // Only reject if the old socket is actually alive in socketMeta.
+    // If onDisconnect hasn't cleared the DB yet (race on reconnect), the old
+    // socketId may still be stored but the socket is already gone — allow takeover.
+    if (
+      session.agentSocketId &&
+      session.agentSocketId !== socket.id &&
+      socketMeta.has(session.agentSocketId)
+    ) {
       this.sendError(SessionErrorCode.AGENT_ALREADY_CONNECTED, 'Another agent is already connected');
       return;
     }
@@ -212,11 +219,15 @@ export class RelayController {
           mobileDeviceId:  session.mobileDeviceId,
           launchType:      session.launchType,
           pairedToken:     meta.token,
+        }).catch((err: unknown) => {
+          this.log('warn', 'completePairing 失败 sessionId=%s err=%s', meta.sessionId, (err as Error)?.message ?? err);
         });
       }
       const pairPayload: SessionPairPayload = {
         sessionId:      meta.sessionId,
         mobileDeviceId: session.mobileDeviceId ?? 'unknown_device',
+        agentPlatform:  payload.platform ?? null,
+        mobilePlatform: session.mobilePlatform ?? null,
         pairedAt:       (session.pairedAt ?? now).getTime(),
       };
       this.app.to(meta.sessionId).emit(Events.SESSION_PAIR, pairPayload);
@@ -307,6 +318,9 @@ export class RelayController {
     if (!session) return;
 
     const mobileDeviceId = payload.mobileDeviceId ?? payload.deviceId;
+    const mobilePlatform = typeof payload.mobilePlatform === 'string'
+      ? payload.mobilePlatform.trim()
+      : '';
 
     // Register/touch mobile device
     if (mobileDeviceId) {
@@ -325,6 +339,7 @@ export class RelayController {
       state:          nextState,
       mobileSocketId: socket.id,
       mobileDeviceId: mobileDeviceId,
+      mobilePlatform: mobilePlatform || session.mobilePlatform,
       pairedAt:       hasAgent ? session.pairedAt ?? now : session.pairedAt,
     });
 
@@ -337,12 +352,16 @@ export class RelayController {
           mobileDeviceId,
           launchType:  session.launchType,
           pairedToken: meta.token,
+        }).catch((err: unknown) => {
+          this.log('warn', 'completePairing 失败 sessionId=%s err=%s', meta.sessionId, (err as Error)?.message ?? err);
         });
       }
 
       const pairPayload: SessionPairPayload = {
         sessionId:      meta.sessionId,
         mobileDeviceId: mobileDeviceId,
+        agentPlatform:  session.agentPlatform ?? null,
+        mobilePlatform: mobilePlatform || session.mobilePlatform,
         pairedAt:       (session.pairedAt ?? now).getTime(),
       };
       this.app.to(meta.sessionId).emit(Events.SESSION_PAIR, pairPayload);
