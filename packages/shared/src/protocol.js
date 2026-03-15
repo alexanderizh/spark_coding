@@ -17,18 +17,33 @@ exports.Events = {
     SESSION_PING: 'session:ping',
     RUNTIME_ENSURE: 'runtime:ensure',
     RUNTIME_STATUS: 'runtime:status',
+    DEVICE_REGISTER: 'device:register', // Either → Server: announce device fingerprint
+    // Desktop → Server
+    DESKTOP_STATUS_REPORT: 'desktop:status:report', // Desktop daemon health report
+    DESKTOP_STATUS_REQUEST: 'desktop:status:request', // Server → Desktop: re-report now
+    DESKTOP_STATUS_UPDATE: 'desktop:status:update', // Server → Mobile: status changed
+    // Mobile → Server
+    SESSION_RESUME: 'session:resume', // Reconnect with existing token (no QR)
+    // Either → Server
+    SESSION_DELETE: 'session:delete', // Client requests session deletion
     // Server → Client (both sides)
     SESSION_STATE: 'session:state',
     SESSION_PAIR: 'session:pair',
     SESSION_ERROR: 'session:error',
+    SESSION_RESUMED: 'session:resumed', // Server → client: resume confirmed
+    SESSION_DELETED: 'session:deleted', // Server → client: session was deleted
+    TERMINAL_SNAPSHOT: 'terminal:snapshot', // Server → Mobile: full-state snapshot
 };
 exports.CliTypes = {
     CLAUDE: 'claude',
 };
 // ── QR pairing URL ───────────────────────────────────────────────────────────
 exports.QR_SCHEME = 'sparkcoder';
-function buildPairUrl(serverUrl, token) {
-    return `${exports.QR_SCHEME}://pair?token=${token}&server=${encodeURIComponent(serverUrl)}`;
+function buildPairUrl(serverUrl, token, desktopDeviceId) {
+    let url = `${exports.QR_SCHEME}://pair?token=${token}&server=${encodeURIComponent(serverUrl)}`;
+    if (desktopDeviceId)
+        url += `&did=${desktopDeviceId}`;
+    return url;
 }
 function parsePairUrl(url) {
     try {
@@ -39,7 +54,8 @@ function parsePairUrl(url) {
         const server = parsed.searchParams.get('server');
         if (!token || !server)
             return null;
-        return { token, server: decodeURIComponent(server) };
+        const desktopDeviceId = parsed.searchParams.get('did') ?? undefined;
+        return { token, server: decodeURIComponent(server), desktopDeviceId };
     }
     catch {
         return null;

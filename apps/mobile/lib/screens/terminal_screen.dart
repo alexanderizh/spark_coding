@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:xterm/xterm.dart';
 
 import '../app/router.dart';
 import '../models/claude_prompt_model.dart';
@@ -12,28 +13,21 @@ import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../services/socket_service.dart';
 import '../utils/app_logger.dart';
-import '../utils/claude_chat_parser.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/input_toolbar.dart';
 
 // ---------------------------------------------------------------------------
-// Turn model
+// Prompt model
 // ---------------------------------------------------------------------------
 
-enum _TurnRole { user, claude }
-
-class _Turn {
-  _Turn({
-    required this.role,
-    required this.text,
-    this.promptType,
-    this.promptResolved = false,
+class _PendingPrompt {
+  _PendingPrompt({
+    required this.type,
+    required this.rawText,
   });
 
-  final _TurnRole role;
-  String text;
-  final ClaudePromptType? promptType;
-  bool promptResolved;
+  final ClaudePromptType type;
+  final String rawText;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,22 +44,25 @@ class TerminalScreen extends ConsumerStatefulWidget {
 class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   StreamSubscription<SessionError>? _errorSub;
   StreamSubscription<TerminalOutput>? _outputSub;
+  StreamSubscription<TerminalSnapshot>? _snapshotSub;
   StreamSubscription<ClaudePrompt>? _promptSub;
   StreamSubscription<RuntimeStatusEvent>? _runtimeSub;
-  final ScrollController _scrollController = ScrollController();
-  final ClaudeChatParser _chatParser = ClaudeChatParser();
-  final Map<int, TerminalOutput> _pendingOutputs = {};
-  int _lastOutputSeq = -1;
-  final List<_Turn> _turns = [];
-  bool _isClaudeStreaming = false;
+  late final Terminal _terminal;
+  _PendingPrompt? _pendingPrompt;
   bool _isTyping = false;
   bool _runtimeEnsuring = false;
+
+  // Cache notifier reference so it can be safely used in dispose()
+  // (ref.read() may throw after widget is unmounted in some Riverpod versions)
+  late final ConnectionNotifier _connectionNotifier;
 
   @override
   void initState() {
     super.initState();
+    _terminal = Terminal(maxLines: 10000);
+    _connectionNotifier = ref.read(connectionNotifierProvider.notifier);
     _listenForErrors();
-    _listenForOutput();
+    _listenForSnapshot();
     _listenForPrompts();
     _listenForRuntime();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -78,9 +75,11 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   void dispose() {
     _errorSub?.cancel();
     _outputSub?.cancel();
+    _snapshotSub?.cancel();
     _promptSub?.cancel();
     _runtimeSub?.cancel();
-    _scrollController.dispose();
+    // Disconnect socket when leaving terminal so the next _openLink() can reconnect cleanly.
+    _connectionNotifier.disconnect();
     super.dispose();
   }
 
@@ -94,65 +93,33 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     });
   }
 
-  void _listenForOutput() {
+  void _listenForSnapshot() {
     final socketService = ref.read(socketServiceProvider);
-    _outputSub = socketService.terminalOutput.listen(_handleTerminalOutput);
-  }
 
-  void _handleTerminalOutput(TerminalOutput output) {
-    final expectedSeq = _lastOutputSeq + 1;
-    if (_lastOutputSeq == -1 || output.seq == expectedSeq) {
-      _ingestOutputChunk(output);
-      var currentSeq = output.seq;
-      while (_pendingOutputs.containsKey(currentSeq + 1)) {
-        currentSeq += 1;
-        final buffered = _pendingOutputs.remove(currentSeq)!;
-        _ingestOutputChunk(buffered);
-      }
-      _lastOutputSeq = currentSeq;
-      return;
-    }
-    if (output.seq > expectedSeq) {
-      _pendingOutputs[output.seq] = output;
-    }
-  }
-
-  void _ingestOutputChunk(TerminalOutput output) {
-    final clean = _chatParser.parseAssistantChunk(output.data);
-    if (clean == null || clean.isEmpty) return;
-    if (!mounted) return;
-    setState(() {
-      if (_isClaudeStreaming &&
-          _turns.isNotEmpty &&
-          _turns.last.role == _TurnRole.claude &&
-          _turns.last.promptType == null) {
-        _turns.last.text = clean; // replace in-place
-      } else {
-        _turns.add(_Turn(role: _TurnRole.claude, text: clean));
-        _isClaudeStreaming = true;
-      }
+    // Full snapshot on reconnect — reset terminal then write plain text
+    _snapshotSub = socketService.terminalSnapshot.listen((snap) {
+      if (!mounted) return;
+      _terminal.write('\x1B[2J\x1B[H');
+      _terminal.write(snap.snapshot);
     });
-    _scrollToBottom();
+
+    // Incremental output — write raw ANSI data directly so colors/styles render
+    _outputSub = socketService.terminalOutput.listen((output) {
+      if (!mounted) return;
+      _terminal.write(output.data);
+    });
   }
 
   void _listenForPrompts() {
     final socketService = ref.read(socketServiceProvider);
     _promptSub = socketService.claudePrompts.listen((prompt) {
-      final displayText = _chatParser.formatPromptText(
-        type: prompt.promptType,
-        rawText: prompt.rawText,
-        fallbackTitle: _promptTitle(prompt.promptType),
-      );
       if (!mounted) return;
       setState(() {
-        _isClaudeStreaming = false;
-        _turns.add(_Turn(
-          role: _TurnRole.claude,
-          text: displayText,
-          promptType: prompt.promptType.requiresYesNo ? prompt.promptType : null,
-        ));
+        _pendingPrompt = _PendingPrompt(
+          type: prompt.promptType,
+          rawText: prompt.rawText,
+        );
       });
-      _scrollToBottom();
     });
   }
 
@@ -179,27 +146,16 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     socketService.sendRuntimeEnsure('claude');
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
-    });
-  }
-
   void _sendMessage(String text) {
     final socketService = ref.read(socketServiceProvider);
-    _chatParser.registerUserInput(text);
     socketService.sendInput('$text\r');
-    if (!mounted) return;
-    setState(() {
-      _isClaudeStreaming = false;
-      _turns.add(_Turn(role: _TurnRole.user, text: text));
-    });
-    _scrollToBottom();
+  }
+
+  /// Sends a raw terminal sequence (e.g. arrow keys, Esc, Enter) without
+  /// appending \r or registering it as user input for echo suppression.
+  void _sendRawInput(String sequence) {
+    final socketService = ref.read(socketServiceProvider);
+    socketService.sendInput(sequence);
   }
 
   void _handleTypingChanged(bool isTyping) {
@@ -213,17 +169,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     return name;
   }
 
-  void _sendPromptDecision({required _Turn turn, required bool approved}) {
+  void _sendPromptDecision({required bool approved}) {
     final socketService = ref.read(socketServiceProvider);
-    _chatParser.registerUserInput(approved ? 'y' : 'n');
     socketService.sendInput(approved ? 'y\r' : 'n\r');
     if (!mounted) return;
     setState(() {
-      turn.promptResolved = true;
-      _isClaudeStreaming = false;
-      _turns.add(_Turn(role: _TurnRole.user, text: approved ? '同意' : '拒绝'));
+      _pendingPrompt = null;
     });
-    _scrollToBottom();
   }
 
   void _showSessionError(String message) {
@@ -296,84 +248,110 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     }
   }
 
-  Widget _buildTurn(_Turn turn) {
-    if (turn.role == _TurnRole.user) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '❯  ',
-              style: TextStyle(
-                color: Color(0xFF9E9E9E),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Expanded(
-              child: Text(
-                turn.text,
-                style: const TextStyle(
-                  color: Color(0xFF616161),
-                  fontSize: 13,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ],
+  Widget _buildTerminalContent() {
+    return Stack(
+      children: [
+        TerminalView(
+          _terminal,
+          readOnly: true,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          theme: const TerminalTheme(
+            cursor: Color(0xFF4FC3F7),
+            selection: Color(0x804FC3F7),
+            foreground: Color(0xFFE0E0E0),
+            background: Color(0xFF1A1A2E),
+            black: Color(0xFF1A1A1A),
+            red: Color(0xFFE06C75),
+            green: Color(0xFF98C379),
+            yellow: Color(0xFFE5C07B),
+            blue: Color(0xFF61AFEF),
+            magenta: Color(0xFFC678DD),
+            cyan: Color(0xFF56B6C2),
+            white: Color(0xFFABB2BF),
+            brightBlack: Color(0xFF5C6370),
+            brightRed: Color(0xFFE06C75),
+            brightGreen: Color(0xFF98C379),
+            brightYellow: Color(0xFFE5C07B),
+            brightBlue: Color(0xFF61AFEF),
+            brightMagenta: Color(0xFFC678DD),
+            brightCyan: Color(0xFF56B6C2),
+            brightWhite: Color(0xFFFFFFFF),
+            searchHitBackground: Color(0xFFE5C07B),
+            searchHitBackgroundCurrent: Color(0xFFE06C75),
+            searchHitForeground: Color(0xFF1A1A1A),
+          ),
         ),
-      );
-    }
-
-    // Claude turn
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            turn.text,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 14,
-              height: 1.6,
+        if (_pendingPrompt != null)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A2E),
+                border: const Border(
+                  top: BorderSide(color: Color(0xFF3A3A5C), width: 1),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      _getPromptTitle(_pendingPrompt!.type),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFE0E0E0),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _sendPromptDecision(approved: false),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            side: const BorderSide(color: Color(0xFF5C6370)),
+                            foregroundColor: const Color(0xFFABB2BF),
+                          ),
+                          child: const Text('拒绝'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _sendPromptDecision(approved: true),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            backgroundColor: const Color(0xFF98C379),
+                            foregroundColor: Colors.black,
+                          ),
+                          child: const Text('同意'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          if (turn.promptType != null && !turn.promptResolved) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        _sendPromptDecision(turn: turn, approved: false),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      side: const BorderSide(color: Color(0xFFBDBDBD)),
-                    ),
-                    child: const Text('拒绝'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () =>
-                        _sendPromptDecision(turn: turn, approved: true),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('同意'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
+      ],
     );
+  }
+
+  String _getPromptTitle(ClaudePromptType type) {
+    return type.displayName;
   }
 
   @override
@@ -393,7 +371,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         connectionStatus == ConnectionStatus.error;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFECEFF3),
+      backgroundColor: const Color(0xFF1A1A2E),
       appBar: _buildAppBar(
         context,
         effectiveStatus,
@@ -416,38 +394,12 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                 : const SizedBox.shrink(key: ValueKey('no_banner')),
           ),
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
-              itemCount: _turns.isEmpty ? 1 : _turns.length,
-              itemBuilder: (context, index) {
-                if (_turns.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 80),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.terminal, color: Colors.black26, size: 28),
-                          SizedBox(height: 8),
-                          Text(
-                            '开始对话',
-                            style: TextStyle(
-                              color: Colors.black38,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-                return _buildTurn(_turns[index]);
-              },
-            ),
+            child: _buildTerminalContent(),
           ),
           InputToolbar(
             onSendMessage: _sendMessage,
             onTypingChanged: _handleTypingChanged,
+            onRawInput: _sendRawInput,
           ),
         ],
       ),
@@ -474,7 +426,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
             height: 10,
             child: CircularProgressIndicator(
               strokeWidth: 1.5,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE6831A)),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE5C07B)),
             ),
           ),
           SizedBox(width: 5),
@@ -482,7 +434,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
             '正在检查 Claude...',
             style: TextStyle(
               fontSize: 11,
-              color: Color(0xFFE6831A),
+              color: Color(0xFFE5C07B),
               fontWeight: FontWeight.normal,
             ),
           ),
@@ -507,8 +459,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     }
 
     return AppBar(
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
+      backgroundColor: const Color(0xFF16213E),
+      foregroundColor: const Color(0xFFE0E0E0),
       centerTitle: false,
       titleSpacing: 0,
       leading: IconButton(
@@ -654,25 +606,6 @@ String _formatTime(DateTime time) {
   final hh = time.hour.toString().padLeft(2, '0');
   final mm = time.minute.toString().padLeft(2, '0');
   return '$hh:$mm';
-}
-
-String _promptTitle(ClaudePromptType type) {
-  switch (type) {
-    case ClaudePromptType.permissionRequest:
-      return '权限请求';
-    case ClaudePromptType.yesNoConfirm:
-      return '确认请求';
-    case ClaudePromptType.toolUseApproval:
-      return '工具调用审批';
-    case ClaudePromptType.multilineInput:
-      return '需要输入内容';
-    case ClaudePromptType.slashCommandHint:
-      return '命令提示';
-    case ClaudePromptType.generalInput:
-      return '输入请求';
-    case ClaudePromptType.unknown:
-      return '提示';
-  }
 }
 
 // ---------------------------------------------------------------------------

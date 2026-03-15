@@ -1,14 +1,24 @@
 "use strict";
 const electron = require("electron");
 electron.contextBridge.exposeInMainWorld("api", {
-  // ── Settings ────────────────────────────────────────────────────────────────
+  // ── Device ───────────────────────────────────────────────────────────────────
+  getDeviceId: () => electron.ipcRenderer.invoke("device:getId"),
+  getDeviceStatus: () => electron.ipcRenderer.invoke("device:getStatus"),
+  // ── Settings ─────────────────────────────────────────────────────────────────
   getSettings: () => electron.ipcRenderer.invoke("settings:get"),
   saveSettings: (patch) => electron.ipcRenderer.invoke("settings:save", patch),
   detectClaude: () => electron.ipcRenderer.invoke("claude:detect"),
-  // ── Session ──────────────────────────────────────────────────────────────────
+  // ── Paired sessions ───────────────────────────────────────────────────────────
+  listPairedSessions: () => electron.ipcRenderer.invoke("session:listPaired"),
+  deleteSession: (sessionId, serverUrl) => electron.ipcRenderer.invoke("session:delete", sessionId, serverUrl),
+  // ── Session ───────────────────────────────────────────────────────────────────
   startSession: () => electron.ipcRenderer.invoke("session:start"),
   stopSession: () => electron.ipcRenderer.invoke("session:stop"),
   getSessionStatus: () => electron.ipcRenderer.invoke("session:getStatus"),
+  getOutputBuffer: () => electron.ipcRenderer.invoke("session:getOutputBuffer"),
+  getLogBuffer: () => electron.ipcRenderer.invoke("session:getLogBuffer"),
+  restartClaude: () => electron.ipcRenderer.invoke("session:restartClaude"),
+  relaunchApp: () => electron.ipcRenderer.invoke("app:relaunch"),
   // ── Events: main → renderer ───────────────────────────────────────────────────
   onStatus: (cb) => {
     const handler = (_, v) => cb(v);
@@ -29,5 +39,13 @@ electron.contextBridge.exposeInMainWorld("api", {
     const handler = (_, v) => cb(v);
     electron.ipcRenderer.on("session:claude-exit", handler);
     return () => electron.ipcRenderer.off("session:claude-exit", handler);
+  },
+  onDesktopStatus: (cb) => {
+    const handler = (_, v) => cb(v);
+    electron.ipcRenderer.on("session:desktop-status", handler);
+    return () => electron.ipcRenderer.off("session:desktop-status", handler);
+  },
+  reportXtermSnapshot: (snapshot) => {
+    electron.ipcRenderer.send("xterm:snapshot", snapshot);
   }
 });

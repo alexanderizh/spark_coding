@@ -5,12 +5,16 @@ import { showMainWindow, setQuitting } from './window-manager'
 let tray: Tray | null = null
 
 export function createTray(): void {
-  // Use a 16x16 blank image as placeholder; replace with real icon in production
   const iconPath = join(__dirname, '../../resources/tray-icon.png')
   let icon: Electron.NativeImage
   try {
-    icon = nativeImage.createFromPath(iconPath)
-    if (icon.isEmpty()) icon = nativeImage.createEmpty()
+    const img = nativeImage.createFromPath(iconPath)
+    if (img.isEmpty()) {
+      icon = nativeImage.createEmpty()
+    } else {
+      // 固定 16x16，避免托盘图标显示异常
+      icon = img.resize({ width: 16, height: 16 })
+    }
   } catch {
     icon = nativeImage.createEmpty()
   }

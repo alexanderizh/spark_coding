@@ -5,6 +5,7 @@ import * as socketio from '@midwayjs/socketio';
 import * as orm from '@midwayjs/typeorm';
 import * as validate from '@midwayjs/validate';
 import { join } from 'path';
+import { TypeORMDataSourceManager } from '@midwayjs/typeorm';
 
 @Configuration({
   imports: [koa, socketio, orm, validate],
@@ -26,6 +27,20 @@ export class ContainerLifeCycle implements ILifeCycle {
       }
       await next();
     });
+
+    // Clear stale socket IDs left from previous server process.
+    // After restart every WebSocket is gone; non-null IDs would cause mobile
+    // to see a phantom "online" state for disconnected desktops.
+    try {
+      const dsm = await this.app.getApplicationContext().getAsync(TypeORMDataSourceManager);
+      const ds  = dsm.getDataSource('default');
+      await ds.query(
+        `UPDATE sessions SET agent_socket_id = NULL, mobile_socket_id = NULL
+         WHERE agent_socket_id IS NOT NULL OR mobile_socket_id IS NOT NULL`,
+      );
+    } catch (err) {
+      console.warn('[spark_coder] clearStaleSocketIds failed:', err);
+    }
 
     console.log('[spark_coder] Server ready');
   }

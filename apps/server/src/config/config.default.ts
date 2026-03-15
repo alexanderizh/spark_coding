@@ -1,5 +1,7 @@
 import { MidwayConfig } from '@midwayjs/core';
 import { Session } from '../entity/session.entity';
+import { Device } from '../entity/device.entity';
+import { DesktopStatus } from '../entity/desktop-status.entity';
 
 export default {
   // Cookie signing keys (required by Midway Koa)
@@ -17,7 +19,7 @@ export default {
       methods: ['GET', 'POST'],
     },
     transports: ['websocket', 'polling'],
-    maxHttpBufferSize: 64 * 1024, // 64 KB
+    maxHttpBufferSize: 256 * 1024, // 256 KB
   },
 
   // CORS for REST endpoints
@@ -40,7 +42,7 @@ export default {
         logging: false,
         // logging: process.env.NODE_ENV === 'local',
         timezone: '+00:00',
-        entities: [Session],
+        entities: [Session, Device, DesktopStatus],
       },
     },
   },

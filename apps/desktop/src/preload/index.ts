@@ -7,7 +7,14 @@ type Unsubscribe = () => void
  * All calls go through contextBridge for security isolation.
  */
 contextBridge.exposeInMainWorld('api', {
-  // ── Settings ────────────────────────────────────────────────────────────────
+  // ── Device ───────────────────────────────────────────────────────────────────
+  getDeviceId: (): Promise<string> =>
+    ipcRenderer.invoke('device:getId'),
+
+  getDeviceStatus: (): Promise<unknown> =>
+    ipcRenderer.invoke('device:getStatus'),
+
+  // ── Settings ─────────────────────────────────────────────────────────────────
   getSettings: (): Promise<unknown> =>
     ipcRenderer.invoke('settings:get'),
 
@@ -17,7 +24,14 @@ contextBridge.exposeInMainWorld('api', {
   detectClaude: (): Promise<string | null> =>
     ipcRenderer.invoke('claude:detect'),
 
-  // ── Session ──────────────────────────────────────────────────────────────────
+  // ── Paired sessions ───────────────────────────────────────────────────────────
+  listPairedSessions: (): Promise<unknown[]> =>
+    ipcRenderer.invoke('session:listPaired'),
+
+  deleteSession: (sessionId: string, serverUrl: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('session:delete', sessionId, serverUrl),
+
+  // ── Session ───────────────────────────────────────────────────────────────────
   startSession: (): Promise<unknown> =>
     ipcRenderer.invoke('session:start'),
 
@@ -26,6 +40,18 @@ contextBridge.exposeInMainWorld('api', {
 
   getSessionStatus: (): Promise<unknown> =>
     ipcRenderer.invoke('session:getStatus'),
+
+  getOutputBuffer: (): Promise<string> =>
+    ipcRenderer.invoke('session:getOutputBuffer'),
+
+  getLogBuffer: (): Promise<string> =>
+    ipcRenderer.invoke('session:getLogBuffer'),
+
+  restartClaude: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('session:restartClaude'),
+
+  relaunchApp: (): Promise<void> =>
+    ipcRenderer.invoke('app:relaunch'),
 
   // ── Events: main → renderer ───────────────────────────────────────────────────
   onStatus: (cb: (v: unknown) => void): Unsubscribe => {
@@ -50,5 +76,15 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (_: IpcRendererEvent, v: number) => cb(v)
     ipcRenderer.on('session:claude-exit', handler)
     return () => ipcRenderer.off('session:claude-exit', handler)
+  },
+
+  onDesktopStatus: (cb: (v: unknown) => void): Unsubscribe => {
+    const handler = (_: IpcRendererEvent, v: unknown) => cb(v)
+    ipcRenderer.on('session:desktop-status', handler)
+    return () => ipcRenderer.off('session:desktop-status', handler)
+  },
+
+  reportXtermSnapshot: (snapshot: string): void => {
+    ipcRenderer.send('xterm:snapshot', snapshot)
   },
 })

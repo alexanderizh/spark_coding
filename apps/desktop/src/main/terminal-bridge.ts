@@ -1,15 +1,16 @@
-import { EventEmitter } from 'events'
-import { execFileSync } from 'child_process'
-import os from 'os'
-import * as pty from 'node-pty'
-import { io, Socket } from 'socket.io-client'
-import axios from 'axios'
+import { EventEmitter }   from 'events'
+import { execFileSync }   from 'child_process'
+import os                 from 'os'
+import * as pty           from 'node-pty'
+import { io, Socket }     from 'socket.io-client'
+import axios              from 'axios'
 import {
   Events,
   SessionState,
   SessionErrorCode,
   AgentRegisterPayload,
   TerminalOutputPayload,
+  TerminalSnapshotPayload,
   TerminalInputPayload,
   TerminalResizePayload,
   ClaudePromptPayload,
@@ -20,13 +21,29 @@ import {
   RuntimeEnsurePayload,
   RuntimeStatusPayload,
   CliTypes,
+  DesktopStatusReportPayload,
+  DesktopStatusUpdatePayload,
+  buildPairUrl,
 } from '@spark_coder/shared'
+import {
+  runHealthCheck,
+  buildStatusReport,
+  reportStatusToServer,
+} from './health-checker'
+import {
+  savePairedSession,
+  updatePairedSessionLastUsed,
+  PairedSessionRecord,
+} from './store'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const BATCH_INTERVAL_MS = 16      // ~60fps
-const RING_BUFFER_SIZE  = 1024 * 1024  // 1 MB
-const ROLLING_BUF_SIZE  = 2048
-const DEBOUNCE_MS       = 100
+const RELAY_LOG_PREFIX = '[relay][host]'
+const BATCH_INTERVAL_MS  = 16        // ~60fps
+const RING_BUFFER_SIZE   = 1024 * 1024  // 1 MB
+const ROLLING_BUF_SIZE   = 2048
+const DISPLAY_BUFFER_MAX = 100 * 1024   // 100 KB for renderer preview
+const DEBOUNCE_MS        = 100
+const DAEMON_INTERVAL_MS = 60_000    // report health every 60 s
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type BridgeStatus =
@@ -39,33 +56,42 @@ export type BridgeStatus =
   | 'stopped'
 
 export interface BridgeConfig {
-  serverUrl: string
+  serverUrl:  string
   claudePath: string
-  cwd: string
+  cwd:        string
+  deviceId:   string   // desktop physical fingerprint
 }
 
 export interface StatusInfo {
-  status: BridgeStatus
+  status:   BridgeStatus
   message?: string
 }
 
 export interface QrInfo {
   qrPayload: string
-  token: string
+  token:     string
   sessionId: string
 }
 
 // ── TerminalBridge ─────────────────────────────────────────────────────────────
 /**
- * Encapsulates all terminal logic (previously apps/terminal) as an EventEmitter.
- * Runs inside the Electron main process — no process.exit(), no CLI args.
+ * Encapsulates all terminal / session logic.  Runs inside the Electron main
+ * process.
+ *
+ * New in v2:
+ *  - Device fingerprint embedded in every register/create call
+ *  - On SESSION_PAIR: saves PairedSessionRecord to local store + server
+ *  - DESKTOP_STATUS_REPORT: emitted via socket whenever daemon fires
+ *  - DESKTOP_STATUS_REQUEST: handled — triggers an immediate status report
+ *  - DESKTOP_STATUS_UPDATE: forwarded to renderer
  *
  * Events emitted:
- *   'status'      → StatusInfo
- *   'qr'          → QrInfo
- *   'output'      → string  (terminal output chunk, for conversation view)
- *   'prompt'      → { type: string; rawText: string }
- *   'claude-exit' → exitCode: number
+ *   'status'          → StatusInfo
+ *   'qr'              → QrInfo
+ *   'output'          → string  (terminal output chunk)
+ *   'prompt'          → { type: string; rawText: string }
+ *   'claude-exit'     → exitCode: number
+ *   'desktop-status'  → DesktopStatusUpdatePayload
  */
 export class TerminalBridge extends EventEmitter {
   private socket?: Socket
@@ -77,6 +103,7 @@ export class TerminalBridge extends EventEmitter {
   private isPaired = false
   private outputSeq = 0
   private config?: BridgeConfig
+  private appStartTime = Date.now()
 
   // Batching
   private batchBuffer = ''
@@ -86,40 +113,110 @@ export class TerminalBridge extends EventEmitter {
   private ringBuffer: string[] = []
   private ringBufferBytes = 0
 
+  // Snapshot buffer (full-state streaming)
+  private snapshotBuffer = ''
+  private readonly SNAPSHOT_MAX_BYTES = 48 * 1024
+
   // Prompt detector state
   private detectorBuffer = ''
   private detectorTimer?: NodeJS.Timeout
 
-  // Keepalive
+  // Keepalive + daemon
   private pingInterval?: NodeJS.Timeout
+  private daemonInterval?: NodeJS.Timeout
+
+  // Display buffer for Session page preview (PTY output only, no logs)
+  private displayBuffer      = ''
+  private displayBufferBytes = 0
+
+  // System log buffer (for Session page info)
+  private logBuffer      = ''
+  private logBufferBytes = 0
+  private readonly LOG_BUFFER_MAX = 8 * 1024  // 8 KB for logs
 
   // Pending runtime status to send after reconnect
   private pendingRuntimeStatus?: RuntimeStatusPayload
 
-  // ── Public API ───────────────────────────────────────────────────────────────
+  // Latest xterm viewport snapshot from renderer (replaces stripAnsi approach)
+  private xtermSnapshot = ''
 
-  getStatus(): BridgeStatus {
-    return this.status
+  // ── Public API ────────────────────────────────────────────────────────────────
+
+  private log(msg: string, ...args: unknown[]): void {
+    const line = `${RELAY_LOG_PREFIX} ${msg} ${args.map(String).join(' ')}\n`
+    console.log(RELAY_LOG_PREFIX, msg, ...args)
+    // Store in log buffer instead of mixing with PTY output
+    this.appendToLogBuffer(line)
   }
 
-  getQrInfo(): QrInfo | undefined {
-    return this.qrInfo
+  /** Emit output to renderer and append to display buffer for Session page. */
+  private emitOutput(data: string): void {
+    const bytes = Buffer.byteLength(data, 'utf8')
+    this.displayBuffer += data
+    this.displayBufferBytes += bytes
+    while (this.displayBufferBytes > DISPLAY_BUFFER_MAX && this.displayBuffer.length > 0) {
+      const drop = Math.min(this.displayBuffer.length, 2048)
+      this.displayBufferBytes -= Buffer.byteLength(this.displayBuffer.slice(0, drop), 'utf8')
+      this.displayBuffer = this.displayBuffer.slice(drop)
+    }
+    this.emit('output', data)
+  }
+
+  private appendToLogBuffer(line: string): void {
+    const bytes = Buffer.byteLength(line, 'utf8')
+    this.logBuffer += line
+    this.logBufferBytes += bytes
+    // Keep log buffer as a ring buffer - maintain only last 8KB
+    while (this.logBufferBytes > this.LOG_BUFFER_MAX && this.logBuffer.length > 0) {
+      const newlinePos = this.logBuffer.indexOf('\n')
+      if (newlinePos === -1) {
+        // No newline; trim aggressively
+        const drop = Math.min(this.logBuffer.length, 512)
+        this.logBufferBytes -= Buffer.byteLength(this.logBuffer.slice(0, drop), 'utf8')
+        this.logBuffer = this.logBuffer.slice(drop)
+      } else {
+        // Remove first line
+        const droppedLine = this.logBuffer.slice(0, newlinePos + 1)
+        this.logBufferBytes -= Buffer.byteLength(droppedLine, 'utf8')
+        this.logBuffer = this.logBuffer.slice(newlinePos + 1)
+      }
+    }
+  }
+
+  getStatus(): BridgeStatus { return this.status }
+  getOutputBuffer(): string { return this.displayBuffer }
+  getLogBuffer(): string { return this.logBuffer }
+  getQrInfo(): QrInfo | undefined { return this.qrInfo }
+
+  /** Called by IPC handler when renderer reports a new xterm viewport snapshot. */
+  setXtermSnapshot(snapshot: string): void {
+    this.xtermSnapshot = snapshot
   }
 
   async start(config: BridgeConfig): Promise<void> {
-    if (this.status !== 'idle' && this.status !== 'stopped' && this.status !== 'error' && this.status !== 'expired') {
-      return
-    }
+    if (
+      this.status !== 'idle' &&
+      this.status !== 'stopped' &&
+      this.status !== 'error' &&
+      this.status !== 'expired'
+    ) return
+
     this.config = config
     this.reset()
     this.setStatus('connecting', `Connecting to ${config.serverUrl}…`)
 
-    // Create session on relay server
+    // ── Startup health check ─────────────────────────────────────────────
+    const health = runHealthCheck(config.claudePath)
+    const report = buildStatusReport(config.deviceId, health, this.appStartTime)
+    // Report via HTTP first (before WebSocket is up)
+    await reportStatusToServer(config.serverUrl, report)
+
+    // ── Create session on relay server ───────────────────────────────────
     let session: { sessionId: string; token: string; qrPayload: string }
     try {
       const res = await axios.post<{ success: boolean; data: typeof session }>(
         `${config.serverUrl}/api/session`,
-        {},
+        { desktopDeviceId: config.deviceId, launchType: 'claude' },
         { timeout: 10_000 },
       )
       if (!res.data.success) throw new Error('Server returned failure')
@@ -131,157 +228,280 @@ export class TerminalBridge extends EventEmitter {
     }
 
     this.sessionId = session.sessionId
-    this.token = session.token
-    this.qrInfo = {
+    this.token     = session.token
+    this.qrInfo    = {
       qrPayload: session.qrPayload,
-      token: session.token,
+      token:     session.token,
       sessionId: session.sessionId,
     }
 
-    // Connect WebSocket
+    // ── Connect WebSocket ────────────────────────────────────────────────
     this.socket = io(config.serverUrl, {
-      auth: { token: session.token, role: 'agent' },
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 30_000,
-      randomizationFactor: 0.5,
-      transports: ['websocket'],
+      auth: {
+        token:    session.token,
+        role:     'agent',
+        deviceId: config.deviceId,
+      },
+      reconnection:          true,
+      reconnectionAttempts:  Infinity,
+      reconnectionDelay:     1000,
+      reconnectionDelayMax:  30_000,
+      randomizationFactor:   0.5,
+      transports:            ['websocket'],
     })
 
     this.registerSocketEvents()
+    this.startDaemon()
   }
 
   stop(): void {
     this.clearTimers()
     try { this.ptyProcess?.kill() } catch { /* ignore */ }
     this.socket?.disconnect()
-    this.ptyProcess = undefined
-    this.socket = undefined
-    this.isPaired = false
-    this.outputSeq = 0
+    this.ptyProcess       = undefined
+    this.socket           = undefined
+    this.isPaired         = false
+    this.outputSeq        = 0
     this.pendingRuntimeStatus = undefined
     this.setStatus('stopped', 'Session stopped')
   }
 
-  // ── Socket events ─────────────────────────────────────────────────────────────
+  restartClaude(): { ok: boolean; error?: string } {
+    if (!this.isPaired || !this.config) {
+      return { ok: false, error: 'Not paired or config missing' }
+    }
+    try { this.ptyProcess?.kill() } catch { /* ignore */ }
+    this.ptyProcess = undefined
+    this.spawnClaude()
+    return { ok: true }
+  }
+
+  // ── Socket events ──────────────────────────────────────────────────────────
 
   private registerSocketEvents(): void {
     const socket = this.socket!
 
     socket.on('connect', () => {
+      this.log('WebSocket 已连接，发送 agent:register')
       const payload: AgentRegisterPayload = {
         sessionToken: this.token!,
-        agentVersion: '1.0.0',
-        platform: process.platform,
-        hostname: os.hostname(),
+        agentVersion: '2.0.0',
+        platform:     process.platform,
+        hostname:     os.hostname(),
+        deviceId:     this.config?.deviceId,
       }
       socket.emit(Events.AGENT_REGISTER, payload)
+      this.log('已发送 agent:register hostname=%s', os.hostname())
       this.setStatus('waiting', 'Waiting for mobile to pair…')
-      // Re-emit QR info after reconnect so renderer can re-render it
       if (this.qrInfo) this.emit('qr', this.qrInfo)
+
       // Re-emit runtime status if Claude is already running
       if (this.ptyProcess && this.sessionId) {
         this.emitRuntimeStatus({
           sessionId: this.sessionId,
-          cliType: CliTypes.CLAUDE,
-          ready: true,
-          started: false,
+          cliType:   CliTypes.CLAUDE,
+          ready:     true,
+          started:   false,
           timestamp: Date.now(),
         })
       }
+
+      // Send current health status
+      this.sendStatusReport()
     })
 
     socket.on('reconnect', () => {
-      // Re-emit pending runtime status after reconnect
+      this.log('WebSocket 重连成功，重新注册 agent')
+      // Re-emit agent:register to ensure server knows we're back
+      if (this.sessionId && this.token) {
+        const payload: AgentRegisterPayload = {
+          sessionToken: this.token,
+          agentVersion: '2.0.0',
+          platform:     process.platform,
+          hostname:     os.hostname(),
+          deviceId:     this.config?.deviceId,
+        }
+        try {
+          socket.emit(Events.AGENT_REGISTER, payload)
+          this.log('重连后重新发送 agent:register')
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          this.log('ERROR: Failed to re-register after reconnect: %s', msg)
+        }
+      }
       if (this.pendingRuntimeStatus && this.sessionId) {
-        this.socket?.emit(Events.RUNTIME_STATUS, this.pendingRuntimeStatus)
+        try {
+          socket.emit(Events.RUNTIME_STATUS, this.pendingRuntimeStatus)
+          this.log('重连后发送 runtime:status')
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          this.log('ERROR: Failed to send runtime:status after reconnect: %s', msg)
+        }
       }
     })
 
-    socket.on('disconnect', (_reason: string) => {
-      // Socket auto-reconnects; don't change UI status
+    socket.on('disconnect', (reason: string) => {
+      this.log('WebSocket 断开 reason=%s isPaired=%s ptyProcess=%s', reason, this.isPaired, !!this.ptyProcess)
+      if (reason === 'transport close' || reason === 'forced close') {
+        this.log('WARNING: Unexpected disconnect with reason: %s', reason)
+      }
     })
 
-    // Mobile paired → spawn Claude
+    // Mobile paired → spawn Claude + save PairedSessionRecord
     socket.on(Events.SESSION_PAIR, (payload: SessionPairPayload) => {
+      this.log('收到 session:pair mobileDeviceId=%s', payload.mobileDeviceId)
       if (this.isPaired) {
-        // Mobile reconnected → flush ring buffer
-        const buffered = this.flushRingBuffer()
-        if (buffered && socket.connected) {
-          const out: TerminalOutputPayload = {
-            sessionId: this.sessionId!,
-            data: buffered,
-            timestamp: Date.now(),
-            seq: ++this.outputSeq,
+        // Mobile reconnected → restore paired status + send snapshot
+        this.setStatus('paired', `Reconnected with ${payload.mobileDeviceId}`)
+        const snap = this.xtermSnapshot || this.snapshotBuffer
+        if (snap && socket.connected && this.sessionId) {
+          try {
+            socket.emit(Events.TERMINAL_SNAPSHOT, {
+              sessionId: this.sessionId,
+              snapshot:  snap,
+              timestamp: Date.now(),
+            })
+            this.log('重连后发送 terminal:snapshot bytes=%s', Buffer.byteLength(snap, 'utf8'))
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            this.log('ERROR sending terminal:snapshot: %s', msg)
           }
-          socket.emit(Events.TERMINAL_OUTPUT, out)
         }
         return
       }
       this.isPaired = true
       this.setStatus('paired', `Paired with ${payload.mobileDeviceId}`)
-      this.spawnClaude()
+
+      try {
+        this.spawnClaude()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        this.log('ERROR in SESSION_PAIR handler: %s', msg)
+        this.setStatus('error', `Failed to initialize session: ${msg}`)
+      }
+
+      // Persist pairing record to local store
+      if (this.config && this.sessionId && this.token) {
+        const record: PairedSessionRecord = {
+          connectionKey:   `${this.config.deviceId}_${payload.mobileDeviceId}_claude`,
+          sessionId:       this.sessionId,
+          tokens:          [this.token],
+          serverUrl:       this.config.serverUrl,
+          desktopDeviceId: this.config.deviceId,
+          mobileDeviceId:  payload.mobileDeviceId,
+          launchType:      'claude',
+          hostname:        os.hostname(),
+          pairedAt:        payload.pairedAt,
+          lastUsedAt:      Date.now(),
+        }
+        try { savePairedSession(record) } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          this.log('WARNING: Failed to save pairing record: %s', msg)
+        }
+      }
     })
 
     // Session state updates
     socket.on(Events.SESSION_STATE, (payload: SessionStatePayload) => {
+      this.log('收到 session:state state=%s', payload.state)
       if (payload.state === SessionState.MOBILE_DISCONNECTED) {
         this.setStatus('waiting', 'Mobile disconnected — Claude still running…')
       }
+      if (payload.state === SessionState.PAIRED && !this.isPaired) {
+        this.isPaired = true
+        this.setStatus('paired', 'Reconnected')
+        if (this.config?.deviceId) {
+          updatePairedSessionLastUsed(
+            `${this.config.deviceId}_${payload.agentHostname ?? 'unknown'}_claude`
+          )
+        }
+      }
+    })
+
+    // Server requests a fresh status report (triggered by mobile)
+    socket.on(Events.DESKTOP_STATUS_REQUEST, () => {
+      this.log('收到 desktop:status:request，发送状态报告')
+      this.sendStatusReport()
     })
 
     // Input from mobile → write to PTY
     socket.on(Events.TERMINAL_INPUT, (payload: TerminalInputPayload) => {
+      this.log('收到 terminal:input bytes=%s', Buffer.byteLength(payload.data, 'utf8'))
       this.ptyProcess?.write(payload.data)
     })
 
     // Resize from mobile
     socket.on(Events.TERMINAL_RESIZE, (payload: TerminalResizePayload) => {
+      this.log('收到 terminal:resize cols=%s rows=%s', payload.cols, payload.rows)
       try { this.ptyProcess?.resize(payload.cols, payload.rows) } catch { /* ignore */ }
     })
 
     socket.on(Events.RUNTIME_ENSURE, (payload: RuntimeEnsurePayload) => {
-      if (payload.cliType !== CliTypes.CLAUDE) {
-        return
-      }
-      // If Claude is already running, respond immediately
+      this.log('收到 runtime:ensure cliType=%s socketConnected=%s', payload.cliType, socket.connected)
+      if (payload.cliType !== CliTypes.CLAUDE) return
       if (this.ptyProcess) {
+        this.log('Claude process already running, sending ready status')
         this.emitRuntimeStatus({
           sessionId: this.sessionId!,
-          cliType: CliTypes.CLAUDE,
-          ready: true,
-          started: false,
+          cliType:   CliTypes.CLAUDE,
+          ready:     true,
+          started:   false,
           timestamp: Date.now(),
         })
+        // Send snapshot so mobile sees current state on reconnect / first enter
+        const snap = this.xtermSnapshot || this.snapshotBuffer
+        if (snap && socket.connected && this.sessionId) {
+          try {
+            socket.emit(Events.TERMINAL_SNAPSHOT, {
+              sessionId: this.sessionId,
+              snapshot:  snap,
+              timestamp: Date.now(),
+            })
+            this.log('runtime:ensure 发送 terminal:snapshot bytes=%s', Buffer.byteLength(snap, 'utf8'))
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            this.log('ERROR sending terminal:snapshot in runtime:ensure: %s', msg)
+          }
+        }
         return
       }
-      // Try to spawn Claude if not already running
       if (!this.config) {
+        this.log('ERROR: config not available in runtime:ensure')
         this.emitRuntimeStatus({
           sessionId: this.sessionId!,
-          cliType: CliTypes.CLAUDE,
-          ready: false,
-          started: false,
-          message: 'Configuration not initialized',
+          cliType:   CliTypes.CLAUDE,
+          ready:     false,
+          started:   false,
+          message:   'Configuration not initialised',
           timestamp: Date.now(),
         })
         return
       }
-      this.spawnClaude()
-      // Emit status after spawning (pty.spawn is synchronous)
+      this.log('Claude process not running, spawning now')
+      try {
+        this.spawnClaude()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        this.log('ERROR spawning Claude in runtime:ensure: %s', msg)
+      }
       this.emitRuntimeStatus({
         sessionId: this.sessionId!,
-        cliType: CliTypes.CLAUDE,
-        ready: !!this.ptyProcess,
-        started: !!this.ptyProcess,
-        message: this.ptyProcess ? undefined : 'Claude CLI failed to start',
+        cliType:   CliTypes.CLAUDE,
+        ready:     !!this.ptyProcess,
+        started:   !!this.ptyProcess,
+        message:   this.ptyProcess ? undefined : 'Claude CLI failed to start',
         timestamp: Date.now(),
       })
     })
 
-    // Errors
+    // Forward desktop status update to renderer
+    socket.on(Events.DESKTOP_STATUS_UPDATE, (payload: DesktopStatusUpdatePayload) => {
+      this.log('收到 desktop:status:update 转发至 renderer')
+      this.emit('desktop-status', payload)
+    })
+
     socket.on(Events.SESSION_ERROR, (payload: SessionErrorPayload) => {
+      this.log('收到 session:error code=%s message=%s', payload.code, payload.message)
       if (payload.code === SessionErrorCode.SESSION_EXPIRED) {
         this.setStatus('expired', 'Session expired — please start a new session')
         this.stop()
@@ -293,32 +513,78 @@ export class TerminalBridge extends EventEmitter {
     // Keepalive ping
     this.pingInterval = setInterval(() => {
       if (socket.connected && this.sessionId) {
-        socket.emit(Events.SESSION_PING, { sessionId: this.sessionId, timestamp: Date.now() })
+        socket.emit(Events.SESSION_PING, {
+          sessionId: this.sessionId,
+          timestamp: Date.now(),
+        })
       }
     }, 30_000)
+  }
+
+  // ── Daemon ────────────────────────────────────────────────────────────────────
+
+  private startDaemon(): void {
+    this.daemonInterval = setInterval(() => {
+      this.sendStatusReport()
+    }, DAEMON_INTERVAL_MS)
+  }
+
+  /**
+   * Run a health check and send the result via both:
+   *  - WebSocket (if connected, for real-time mobile update)
+   *  - HTTP REST (for persistence in server DB)
+   */
+  private sendStatusReport(): void {
+    if (!this.config) return
+    const health  = runHealthCheck(this.config.claudePath)
+    const report  = buildStatusReport(this.config.deviceId, health, this.appStartTime)
+
+    // Inject Claude process status if PTY is running
+    if (this.ptyProcess) {
+      report.claudeStatus = 'running'
+    }
+
+    // Inject terminal status based on PTY availability
+    report.terminalStatus = 'running'
+
+    // Socket emit (real-time)
+    if (this.socket?.connected) {
+      const payload: DesktopStatusReportPayload = report
+      this.socket.emit(Events.DESKTOP_STATUS_REPORT, payload)
+      this.log('发送 desktop:status:report overallStatus=%s', report.overallStatus)
+    }
+
+    // REST persist (non-blocking)
+    reportStatusToServer(this.config.serverUrl, report).catch(() => {/* ignore */})
   }
 
   // ── PTY (Claude CLI) ──────────────────────────────────────────────────────────
 
   private spawnClaude(): void {
-    if (!this.config) return
+    if (!this.config) {
+      this.log('ERROR: config not available for spawning Claude')
+      return
+    }
     const execPath = this.resolveExecutable(this.config.claudePath)
+    this.log('Attempting to spawn Claude at: %s', execPath)
 
     try {
       this.ptyProcess = pty.spawn(execPath, [], {
         name: 'xterm-256color',
         cols: 220,
         rows: 50,
-        cwd: this.config.cwd,
-        env: {
+        cwd:  this.config.cwd,
+        env:  {
           ...process.env,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          LANG: 'en_US.UTF-8',
+          TERM:       'xterm-256color',
+          COLORTERM:  'truecolor',
+          LANG:       'en_US.UTF-8',
         } as Record<string, string>,
       })
+      this.log('Claude process spawned successfully, pid=%s', this.ptyProcess.pid)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      this.log('ERROR: Failed to spawn Claude CLI at "%s": %s', execPath, msg)
       this.setStatus('error', `Cannot spawn Claude CLI at "${execPath}": ${msg}`)
       return
     }
@@ -330,18 +596,17 @@ export class TerminalBridge extends EventEmitter {
     })
 
     this.ptyProcess.onExit(({ exitCode }) => {
+      this.log('Claude process exited with code: %s', exitCode)
       this.emit('claude-exit', exitCode)
       this.ptyProcess = undefined
     })
   }
 
   private emitRuntimeStatus(payload: RuntimeStatusPayload): void {
-    // Store as pending in case socket is not connected
     this.pendingRuntimeStatus = payload
-
-    // Emit if socket is connected
     if (this.socket?.connected) {
       this.socket.emit(Events.RUNTIME_STATUS, payload)
+      this.log('发送 runtime:status ready=%s', payload.ready)
     }
   }
 
@@ -351,21 +616,26 @@ export class TerminalBridge extends EventEmitter {
     this.batchBuffer += data
     if (!this.batchTimer) {
       this.batchTimer = setTimeout(() => {
-        const chunk = this.batchBuffer
-        this.batchBuffer = ''
-        this.batchTimer = undefined
+        const chunk       = this.batchBuffer
+        this.batchBuffer  = ''
+        this.batchTimer   = undefined
+
+        // Strip ANSI and append to snapshot
+        const cleanChunk = this.stripAnsiForSnapshot(chunk)
+        this.appendToSnapshot(cleanChunk)
 
         if (this.socket?.connected && this.sessionId) {
           const payload: TerminalOutputPayload = {
             sessionId: this.sessionId,
-            data: chunk,
+            data:      chunk,
             timestamp: Date.now(),
-            seq: ++this.outputSeq,
+            seq:       ++this.outputSeq,
+            snapshot:  this.xtermSnapshot || this.snapshotBuffer,
           }
           this.socket.emit(Events.TERMINAL_OUTPUT, payload)
+          if (payload.seq % 50 === 0) this.log('发送 terminal:output seq=%s bytes=%s', payload.seq, Buffer.byteLength(chunk, 'utf8'))
         }
-        // Also emit locally for conversation view
-        this.emit('output', chunk)
+        this.emitOutput(chunk)
       }, BATCH_INTERVAL_MS)
     }
   }
@@ -383,18 +653,66 @@ export class TerminalBridge extends EventEmitter {
         if (match) {
           if (this.socket?.connected && this.sessionId) {
             const payload: ClaudePromptPayload = {
-              sessionId: this.sessionId,
+              sessionId:  this.sessionId,
               promptType: type,
-              rawText: match[0],
-              timestamp: Date.now(),
+              rawText:    match[0],
+              timestamp:  Date.now(),
             }
             this.socket.emit(Events.CLAUDE_PROMPT, payload)
+            this.log('发送 claude:prompt type=%s', type)
           }
           this.emit('prompt', { type, rawText: match[0] })
           break
         }
       }
     }, DEBOUNCE_MS)
+  }
+
+  // ── Snapshot ANSI stripping ──────────────────────────────────────────────
+
+  private stripAnsiForSnapshot(raw: string): string {
+    // eslint-disable-next-line no-control-regex
+    // Comprehensive ANSI sequence removal:
+    // - CSI sequences: \x1B[...letter (including ? prefix for private modes)
+    // - OSC sequences: \x1B]...(\x07|\x1B\\)
+    // - Other escapes: \x1B followed by various characters
+    let clean = raw.replace(
+      /\x1B(?:\[[?0-9;]*[a-zA-Z]|\][^\x07]*(?:\x07|\x1B\\)|[=()>\/][0-9A-Za-z]*)/g,
+      ''
+    )
+    // Remove any remaining bare ESC characters
+    clean = clean.replace(/\x1B/g, '')
+    // Normalize line endings: \r\n → \n
+    clean = clean.replace(/\r\n/g, '\n')
+    // Handle carriage return on same line (terminal overwrite - keep only after last \r)
+    const lines = clean.split('\n')
+    return lines.map(line => {
+      const lastCR = line.lastIndexOf('\r')
+      return lastCR >= 0 ? line.substring(lastCR + 1) : line
+    }).join('\n')
+  }
+
+  // ── Snapshot accumulation ────────────────────────────────────────────────
+
+  private appendToSnapshot(cleanChunk: string): void {
+    this.snapshotBuffer += cleanChunk
+    const bytes = Buffer.byteLength(this.snapshotBuffer, 'utf8')
+    if (bytes > this.SNAPSHOT_MAX_BYTES) {
+      // Trim from the start, keeping line boundaries
+      let trimmed = this.snapshotBuffer
+      while (Buffer.byteLength(trimmed, 'utf8') > this.SNAPSHOT_MAX_BYTES) {
+        // Find the first newline and remove everything before it
+        const newlinePos = trimmed.indexOf('\n')
+        if (newlinePos === -1) {
+          // No newline found; aggressively trim 10% of content
+          trimmed = trimmed.substring(Math.ceil(trimmed.length * 0.1))
+        } else {
+          // Remove everything up to and including the first newline
+          trimmed = trimmed.substring(newlinePos + 1)
+        }
+      }
+      this.snapshotBuffer = trimmed
+    }
   }
 
   // ── Ring buffer (reconnect catch-up) ──────────────────────────────────────────
@@ -410,8 +728,8 @@ export class TerminalBridge extends EventEmitter {
   }
 
   private flushRingBuffer(): string {
-    const data = this.ringBuffer.join('')
-    this.ringBuffer = []
+    const data        = this.ringBuffer.join('')
+    this.ringBuffer   = []
     this.ringBufferBytes = 0
     return data
   }
@@ -423,7 +741,7 @@ export class TerminalBridge extends EventEmitter {
       return command
     }
     try {
-      const cmd = process.platform === 'win32' ? 'where' : 'which'
+      const cmd    = process.platform === 'win32' ? 'where' : 'which'
       const result = execFileSync(cmd, [command], { encoding: 'utf8' }).trim()
       return result.split(/\r?\n/)[0]?.trim() || command
     } catch {
@@ -433,30 +751,37 @@ export class TerminalBridge extends EventEmitter {
 
   private setStatus(status: BridgeStatus, message?: string): void {
     this.status = status
-    const info: StatusInfo = { status, message }
-    this.emit('status', info)
+    this.emit('status', { status, message } satisfies StatusInfo)
   }
 
   private clearTimers(): void {
-    if (this.batchTimer) clearTimeout(this.batchTimer)
+    if (this.batchTimer)    clearTimeout(this.batchTimer)
     if (this.detectorTimer) clearTimeout(this.detectorTimer)
-    if (this.pingInterval) clearInterval(this.pingInterval)
-    this.batchTimer = undefined
-    this.detectorTimer = undefined
-    this.pingInterval = undefined
+    if (this.pingInterval)  clearInterval(this.pingInterval)
+    if (this.daemonInterval) clearInterval(this.daemonInterval)
+    this.batchTimer     = undefined
+    this.detectorTimer  = undefined
+    this.pingInterval   = undefined
+    this.daemonInterval = undefined
   }
 
   private reset(): void {
     this.clearTimers()
-    this.ringBuffer = []
-    this.ringBufferBytes = 0
-    this.detectorBuffer = ''
-    this.batchBuffer = ''
-    this.isPaired = false
-    this.outputSeq = 0
-    this.qrInfo = undefined
-    this.sessionId = undefined
-    this.token = undefined
+    this.displayBuffer    = ''
+    this.displayBufferBytes = 0
+    this.logBuffer        = ''
+    this.logBufferBytes   = 0
+    this.ringBuffer       = []
+    this.ringBufferBytes  = 0
+    this.snapshotBuffer   = ''
+    this.xtermSnapshot    = ''
+    this.detectorBuffer   = ''
+    this.batchBuffer      = ''
+    this.isPaired         = false
+    this.outputSeq        = 0
+    this.qrInfo           = undefined
+    this.sessionId        = undefined
+    this.token            = undefined
     this.pendingRuntimeStatus = undefined
   }
 }

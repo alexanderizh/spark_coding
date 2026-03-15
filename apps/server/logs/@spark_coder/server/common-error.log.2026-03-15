@@ -1,0 +1,72 @@
+2026-03-15 12:38:23.192 ERROR 32833 QueryFailedError: Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'
+    at Query.onResult (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:248:33)
+    at Query.execute (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/commands/command.js:36:14)
+    at PoolConnection.handlePacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:508:34)
+    at PacketParser.onPacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:93:12)
+    at PacketParser.executeStart (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/packet_parser.js:75:16)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:100:25)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Socket.Readable.push (node:internal/streams/readable:392:5) {
+  query: 'UPDATE `sessions` SET `connection_key` = ?, `mobile_device_id` = ?, `desktop_device_id` = ?, `tokens` = ?, `expires_at` = ?, `last_activity_at` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9c87eb_claude',
+    'c93df8f1-25f2-4362-93ef-46202d9c87eb',
+    '175236ffb9d93e8b2f3817815e174b43',
+    '["386dfb77361cbce14a2891f553fdb5a98af6012d0c6ba935fc801619a8fe72ae"]',
+    null,
+    2026-03-15T04:38:23.131Z,
+    '7435740d-8e03-4e88-857f-c6c42dd9e300'
+  ],
+  driverError: Error: Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'
+      at Packet.asError (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/packets/packet.js:788:17)
+      at Query.execute (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/commands/command.js:29:26)
+      at PoolConnection.handlePacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:508:34)
+      at PacketParser.onPacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:93:12)
+      at PacketParser.executeStart (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/packet_parser.js:75:16)
+      at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:100:25)
+      at Socket.emit (node:events:518:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Socket.Readable.push (node:internal/streams/readable:392:5) {
+    code: 'ER_DUP_ENTRY',
+    errno: 1062,
+    sqlState: '23000',
+    sqlMessage: "Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'",
+    sql: 'UPDATE `sessions` SET `connection_key` = \'175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9c87eb_claude\', `mobile_device_id` = \'c93df8f1-25f2-4362-93ef-46202d9c87eb\', `desktop_device_id` = \'175236ffb9d93e8b2f3817815e174b43\', `tokens` = \'[\\"386dfb77361cbce14a2891f553fdb5a98af6012d0c6ba935fc801619a8fe72ae\\"]\', `expires_at` = NULL, `last_activity_at` = \'2026-03-15 04:38:23.131\', `updated_at` = CURRENT_TIMESTAMP WHERE `id` IN (\'7435740d-8e03-4e88-857f-c6c42dd9e300\')'
+  },
+  code: 'ER_DUP_ENTRY',
+  errno: 1062,
+  sqlState: '23000',
+  sqlMessage: "Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'",
+  sql: 'UPDATE `sessions` SET `connection_key` = \'175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9c87eb_claude\', `mobile_device_id` = \'c93df8f1-25f2-4362-93ef-46202d9c87eb\', `desktop_device_id` = \'175236ffb9d93e8b2f3817815e174b43\', `tokens` = \'[\\"386dfb77361cbce14a2891f553fdb5a98af6012d0c6ba935fc801619a8fe72ae\\"]\', `expires_at` = NULL, `last_activity_at` = \'2026-03-15 04:38:23.131\', `updated_at` = CURRENT_TIMESTAMP WHERE `id` IN (\'7435740d-8e03-4e88-857f-c6c42dd9e300\')'
+}
+2026-03-15 15:12:09.360 ERROR 61528 [-/::ffff:192.168.1.10/-/152ms POST /api/device/status] QueryFailedError: Can't add new command when connection is in closed state
+    at Query.onResult (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:248:33)
+    at PoolConnection._addCommandClosedState (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:164:11)
+    at PoolConnection.query (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:604:17)
+    at /Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:209:36
+    at new Promise (<anonymous>)
+    at MysqlQueryRunner.query (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:199:16)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at MysqlQueryRunner.startTransaction (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:128:13)
+    at EntityPersistExecutor.execute (/Users/zhangyang/spark_ai_project/spark_coding/src/persistence/EntityPersistExecutor.ts:175:25)
+    at DeviceService.upsertDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/device.service.ts:66:5) {
+  query: 'START TRANSACTION',
+  parameters: undefined,
+  driverError: Error: Can't add new command when connection is in closed state
+      at PoolConnection._addCommandClosedState (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:159:17)
+      at PoolConnection.query (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:604:17)
+      at /Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:209:36
+      at new Promise (<anonymous>)
+      at MysqlQueryRunner.query (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:199:16)
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at MysqlQueryRunner.startTransaction (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:128:13)
+      at EntityPersistExecutor.execute (/Users/zhangyang/spark_ai_project/spark_coding/src/persistence/EntityPersistExecutor.ts:175:25)
+      at DeviceService.upsertDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/device.service.ts:66:5)
+      at SessionController.reportDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/controller/session.controller.ts:182:5) {
+    fatal: true
+  },
+  fatal: true
+}

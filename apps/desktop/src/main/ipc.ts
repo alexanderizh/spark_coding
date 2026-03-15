@@ -1,7 +1,9 @@
-import { ipcMain, BrowserWindow } from 'electron'
-import { TerminalBridge, BridgeConfig } from './terminal-bridge'
-import { getSettings, saveSettings, AppSettings } from './store'
-import { detectClaudePath } from './claude-detector'
+import { ipcMain, BrowserWindow, app, IpcMainEvent }    from 'electron'
+import { TerminalBridge, BridgeConfig }                  from './terminal-bridge'
+import { getSettings, saveSettings, getEffectiveServerUrl, AppSettings, getPairedSessions, removePairedSessionById } from './store'
+import { detectClaudePath }                              from './claude-detector'
+import { getOrCreateDeviceId }                           from './device-id'
+import { runHealthCheck, buildStatusReport }             from './health-checker'
 
 let bridge: TerminalBridge | null = null
 
@@ -10,7 +12,37 @@ let bridge: TerminalBridge | null = null
  * Call once after the main window is created.
  */
 export function setupIpc(getWindow: () => BrowserWindow | null): void {
-  // ── Settings ────────────────────────────────────────────────────────────────
+  // ── Device ───────────────────────────────────────────────────────────────
+  ipcMain.handle('device:getId', () => getOrCreateDeviceId())
+
+  ipcMain.handle('device:getStatus', () => {
+    const settings   = getSettings()
+    const deviceId   = getOrCreateDeviceId()
+    const health     = runHealthCheck(settings.claudePath)
+    const report     = buildStatusReport(deviceId, health, app.getStartTime?.() ?? Date.now())
+    // Inject live Claude process state
+    if (bridge && bridge.getStatus() === 'paired') {
+      report.claudeStatus   = 'running'
+      report.terminalStatus = 'running'
+      report.overallStatus  = 'healthy'
+    }
+    return report
+  })
+
+  // ── Paired sessions ───────────────────────────────────────────────────────
+  ipcMain.handle('session:listPaired', () => getPairedSessions())
+
+  ipcMain.handle('session:delete', async (_e, sessionId: string, serverUrl: string) => {
+    removePairedSessionById(sessionId)
+    try {
+      await fetch(`${serverUrl}/api/session/${sessionId}`, { method: 'DELETE' })
+    } catch (_) {
+      // server may be unreachable; local removal is sufficient
+    }
+    return { ok: true }
+  })
+
+  // ── Settings ─────────────────────────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings())
 
   ipcMain.handle('settings:save', (_e, patch: Partial<AppSettings>) => {
@@ -19,12 +51,17 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('claude:detect', () => detectClaudePath())
 
-  // ── Session ──────────────────────────────────────────────────────────────────
+  // ── Session ───────────────────────────────────────────────────────────────
   ipcMain.handle('session:start', async () => {
-    const settings = getSettings()
+    const settings  = getSettings()
+    const serverUrl = getEffectiveServerUrl()
+    const deviceId  = getOrCreateDeviceId()
 
-    if (!settings.serverUrl) {
-      return { error: 'Relay server URL is not configured. Please check Settings.' }
+    if (!serverUrl) {
+      return {
+        error: 'Relay server URL is not configured. ' +
+               'Please set it in Settings or set the RELAY_SERVER_URL env var.',
+      }
     }
 
     if (bridge) {
@@ -36,9 +73,10 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
     wireBridgeEvents(bridge, getWindow)
 
     const config: BridgeConfig = {
-      serverUrl: settings.serverUrl,
+      serverUrl,
       claudePath: settings.claudePath,
-      cwd: settings.cwd,
+      cwd:        settings.cwd,
+      deviceId,
     }
     await bridge.start(config)
     return { ok: true }
@@ -56,6 +94,28 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
       qrInfo: bridge.getQrInfo(),
     }
   })
+
+  ipcMain.handle('session:getOutputBuffer', () => {
+    return bridge?.getOutputBuffer() ?? ''
+  })
+
+  ipcMain.handle('session:getLogBuffer', () => {
+    return bridge?.getLogBuffer() ?? ''
+  })
+
+  ipcMain.handle('session:restartClaude', () => {
+    if (!bridge) return { ok: false, error: 'No active session' }
+    return bridge.restartClaude()
+  })
+
+  ipcMain.handle('app:relaunch', () => {
+    app.relaunch()
+    app.exit(0)
+  })
+
+  ipcMain.on('xterm:snapshot', (_e: IpcMainEvent, snapshot: string) => {
+    bridge?.setXtermSnapshot(snapshot)
+  })
 }
 
 /**
@@ -69,11 +129,12 @@ function wireBridgeEvents(b: TerminalBridge, getWindow: () => BrowserWindow | nu
     }
   }
 
-  b.on('status', (info) => send('session:status', info))
-  b.on('qr',     (info) => send('session:qr', info))
-  b.on('output', (data) => send('session:output', data))
-  b.on('prompt', (p)    => send('session:prompt', p))
-  b.on('claude-exit', (code) => send('session:claude-exit', code))
+  b.on('status',         (info)  => send('session:status',        info))
+  b.on('qr',             (info)  => send('session:qr',            info))
+  b.on('output',         (data)  => send('session:output',        data))
+  b.on('prompt',         (p)     => send('session:prompt',        p))
+  b.on('claude-exit',    (code)  => send('session:claude-exit',   code))
+  b.on('desktop-status', (stat)  => send('session:desktop-status', stat))
 }
 
 /**
@@ -81,17 +142,20 @@ function wireBridgeEvents(b: TerminalBridge, getWindow: () => BrowserWindow | nu
  * Called after the main window finishes loading.
  */
 export async function maybeAutoStart(getWindow: () => BrowserWindow | null): Promise<void> {
-  const settings = getSettings()
-  if (!settings.autoStart || !settings.serverUrl) return
+  const settings  = getSettings()
+  const serverUrl = getEffectiveServerUrl()
+  const deviceId  = getOrCreateDeviceId()
 
+  if (!settings.autoStart || !serverUrl) return
   if (bridge) return  // already running
 
   bridge = new TerminalBridge()
   wireBridgeEvents(bridge, getWindow)
 
   await bridge.start({
-    serverUrl: settings.serverUrl,
+    serverUrl,
     claudePath: settings.claudePath,
-    cwd: settings.cwd,
+    cwd:        settings.cwd,
+    deviceId,
   })
 }

@@ -123,13 +123,20 @@ class SessionService {
     required String sessionId,
     CliType cliType = CliType.claude,
     String? hostName,
+    String? desktopDeviceId,
+    String? connectionKey,
     bool setActive = true,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final normalizedHost = hostName?.trim();
     var targetIndex = -1;
 
-    if (normalizedHost != null && normalizedHost.isNotEmpty) {
+    // Prefer matching by connectionKey (stable across token refreshes)
+    if (connectionKey != null && connectionKey.isNotEmpty) {
+      targetIndex = _links.indexWhere((item) => item.connectionKey == connectionKey);
+    }
+
+    if (targetIndex < 0 && normalizedHost != null && normalizedHost.isNotEmpty) {
       targetIndex = _links.indexWhere(
         (item) =>
             (item.hostName ?? '').trim() == normalizedHost &&
@@ -156,20 +163,19 @@ class SessionService {
     }
 
     final link = ConnectionLink(
-      id: targetIndex >= 0 ? _links[targetIndex].id : _uuid.v4(),
-      serverUrl: serverUrl,
-      token: token,
-      sessionId: sessionId,
-      cliType: cliType,
-      hostName: normalizedHost,
-      status: targetIndex >= 0
-          ? _links[targetIndex].status
-          : LinkStatus.unknown,
-      lastCheckedAt: targetIndex >= 0
-          ? _links[targetIndex].lastCheckedAt
-          : null,
-      createdAt: targetIndex >= 0 ? _links[targetIndex].createdAt : now,
-      updatedAt: now,
+      id:              targetIndex >= 0 ? _links[targetIndex].id : _uuid.v4(),
+      serverUrl:       serverUrl,
+      token:           token,
+      sessionId:       sessionId,
+      connectionKey:   connectionKey ?? (targetIndex >= 0 ? _links[targetIndex].connectionKey : null),
+      cliType:         cliType,
+      hostName:        normalizedHost,
+      desktopDeviceId: desktopDeviceId ?? (targetIndex >= 0 ? _links[targetIndex].desktopDeviceId : null),
+      mobileDeviceId:  _deviceId,
+      status:          targetIndex >= 0 ? _links[targetIndex].status : LinkStatus.unknown,
+      lastCheckedAt:   targetIndex >= 0 ? _links[targetIndex].lastCheckedAt : null,
+      createdAt:       targetIndex >= 0 ? _links[targetIndex].createdAt : now,
+      updatedAt:       now,
     );
 
     if (targetIndex >= 0) {

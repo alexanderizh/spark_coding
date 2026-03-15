@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npx electron:*)",
+      "Bash(git config:*)",
+      "Bash(ln:*)"
+    ]
+  }
+}

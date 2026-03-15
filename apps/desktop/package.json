@@ -10,22 +10,26 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist": "npm run build && electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-rebuild -f -w node-pty || true"
   },
   "dependencies": {
     "@spark_coder/shared": "^1.0.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
     "node-pty": "^1.0.0",
     "qrcode": "^1.5.3",
     "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "@types/node": "^20.11.0",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "electron": "^33.0.0",
+    "electron": "^33.4.11",
     "electron-builder": "^24.13.0",
     "electron-vite": "^2.3.0",
     "react": "^18.3.0",

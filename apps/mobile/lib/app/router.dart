@@ -9,6 +9,10 @@ import '../screens/scanner_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/terminal_screen.dart';
 
+/// Route observer for detecting when user returns to a route (e.g. HomeScreen).
+/// Used to auto-refresh session list when navigating back from terminal/scan/settings.
+final routeObserver = RouteObserver<ModalRoute<void>>();
+
 // Named route constants to avoid magic strings throughout the app.
 class AppRoutes {
   static const home = '/';
@@ -25,6 +29,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.home,
     refreshListenable: connectionListenable,
+    observers: [routeObserver],
     debugLogDiagnostics: false,
     routes: [
       GoRoute(

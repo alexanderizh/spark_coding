@@ -36,6 +36,28 @@ enum SessionState {
       orElse: () => SessionState.unknown,
     );
   }
+
+  /// 中文显示标签
+  String get label {
+    switch (this) {
+      case SessionState.waitingForAgent:
+        return '等待主机连接';
+      case SessionState.waitingForMobile:
+        return '等待移动端连接';
+      case SessionState.paired:
+        return '已配对';
+      case SessionState.agentDisconnected:
+        return '主机已断开';
+      case SessionState.mobileDisconnected:
+        return '移动端已断开';
+      case SessionState.expired:
+        return '已过期';
+      case SessionState.error:
+        return '错误';
+      case SessionState.unknown:
+        return '未知';
+    }
+  }
 }
 
 /// Immutable data class representing the current pairing session.
@@ -204,6 +226,7 @@ class TerminalOutput {
     required this.data,
     required this.timestamp,
     required this.seq,
+    this.snapshot,
   });
 
   final String sessionId;
@@ -216,10 +239,37 @@ class TerminalOutput {
   /// Monotonically increasing sequence number for ordering.
   final int seq;
 
+  /// Complete accumulated clean text (ANSI stripped).
+  final String? snapshot;
+
   factory TerminalOutput.fromJson(Map<String, dynamic> json) => TerminalOutput(
     sessionId: json['sessionId'] as String,
     data: json['data'] as String,
     timestamp: json['timestamp'] as int,
     seq: json['seq'] as int,
+    snapshot: json['snapshot'] as String?,
+  );
+}
+
+/// Represents a complete terminal state snapshot from the server.
+@immutable
+class TerminalSnapshot {
+  const TerminalSnapshot({
+    required this.sessionId,
+    required this.snapshot,
+    required this.timestamp,
+  });
+
+  final String sessionId;
+
+  /// Complete accumulated clean text (ANSI stripped).
+  final String snapshot;
+
+  final int timestamp;
+
+  factory TerminalSnapshot.fromJson(Map<String, dynamic> json) => TerminalSnapshot(
+    sessionId: json['sessionId'] as String,
+    snapshot: json['snapshot'] as String,
+    timestamp: json['timestamp'] as int,
   );
 }

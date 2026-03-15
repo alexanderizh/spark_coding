@@ -23,6 +23,8 @@ class SocketService {
 
   final _terminalOutputController =
       StreamController<TerminalOutput>.broadcast();
+  final _terminalSnapshotController =
+      StreamController<TerminalSnapshot>.broadcast();
   final _claudePromptsController = StreamController<ClaudePrompt>.broadcast();
   final _sessionStatesController =
       StreamController<SessionStateEvent>.broadcast();
@@ -32,6 +34,10 @@ class SocketService {
       StreamController<RuntimeStatusEvent>.broadcast();
   final _connectionStatusController =
       StreamController<SocketConnectionStatus>.broadcast();
+  final _desktopStatusController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _sessionDeletedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // ---------------------------------------------------------------------------
   // Public streams
@@ -39,6 +45,9 @@ class SocketService {
 
   /// Raw terminal output chunks from the host agent.
   Stream<TerminalOutput> get terminalOutput => _terminalOutputController.stream;
+
+  /// Complete terminal state snapshots from the server.
+  Stream<TerminalSnapshot> get terminalSnapshot => _terminalSnapshotController.stream;
 
   /// Interactive Claude prompts detected by the host agent.
   Stream<ClaudePrompt> get claudePrompts => _claudePromptsController.stream;
@@ -59,6 +68,14 @@ class SocketService {
   /// Raw socket connection status (connected / disconnected / error).
   Stream<SocketConnectionStatus> get connectionStatus =>
       _connectionStatusController.stream;
+
+  /// Desktop daemon health status updates forwarded from server.
+  Stream<Map<String, dynamic>> get desktopStatus =>
+      _desktopStatusController.stream;
+
+  /// Fired when the session is deleted by either side.
+  Stream<Map<String, dynamic>> get sessionDeleted =>
+      _sessionDeletedController.stream;
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -111,6 +128,7 @@ class SocketService {
   /// Sends a raw terminal input string to the host agent.
   void sendInput(String data) {
     if (!isConnected || _currentSessionId == null) return;
+    AppLogger.info('SocketService', '发送 terminal:input bytes=${data.length}');
     _socket!.emit('terminal:input', {
       'sessionId': _currentSessionId,
       'data': data,
@@ -120,6 +138,7 @@ class SocketService {
   /// Notifies the host agent that the terminal dimensions have changed.
   void sendResize(int cols, int rows) {
     if (!isConnected || _currentSessionId == null) return;
+    AppLogger.info('SocketService', '发送 terminal:resize cols=$cols rows=$rows');
     _socket!.emit('terminal:resize', {
       'sessionId': _currentSessionId,
       'cols': cols,
@@ -130,6 +149,7 @@ class SocketService {
   void sendRuntimeEnsure(String cliType) {
     _pendingRuntimeCliType = cliType;
     if (!isConnected || _currentSessionId == null) return;
+    AppLogger.info('SocketService', '发送 runtime:ensure cliType=$cliType');
     _socket!.emit('runtime:ensure', {
       'sessionId': _currentSessionId,
       'cliType': cliType,
@@ -139,8 +159,13 @@ class SocketService {
   /// Gracefully closes the socket and cleans up all resources.
   Future<void> disconnect() async {
     _stopPing();
-    _socket?.dispose();
-    _socket = null;
+    if (_socket != null) {
+      // Emit disconnected before nulling the reference so the ConnectionNotifier
+      // receives the event immediately, before any async socket callbacks fire.
+      _connectionStatusController.add(SocketConnectionStatus.disconnected);
+      _socket!.dispose();
+      _socket = null;
+    }
     _currentSessionId = null;
     _pendingRuntimeCliType = null;
   }
@@ -150,12 +175,15 @@ class SocketService {
   void dispose() {
     disconnect();
     _terminalOutputController.close();
+    _terminalSnapshotController.close();
     _claudePromptsController.close();
     _sessionStatesController.close();
     _sessionPairsController.close();
     _sessionErrorsController.close();
     _runtimeStatusController.close();
     _connectionStatusController.close();
+    _desktopStatusController.close();
+    _sessionDeletedController.close();
   }
 
   // ---------------------------------------------------------------------------
@@ -170,6 +198,7 @@ class SocketService {
     final socket = _socket!;
 
     socket.onConnect((_) {
+      if (_socket != socket) return; // Stale socket — ignore
       AppLogger.info('SocketService', 'onConnect: 已连接到中继服务器');
       _connectionStatusController.add(SocketConnectionStatus.connected);
 
@@ -188,12 +217,14 @@ class SocketService {
     });
 
     socket.onDisconnect((reason) {
+      if (_socket != socket) return; // Stale socket — ignore
       AppLogger.warn('SocketService', 'onDisconnect: 断开连接', reason);
       _stopPing();
       _connectionStatusController.add(SocketConnectionStatus.disconnected);
     });
 
     socket.onConnectError((error) {
+      if (_socket != socket) return; // Stale socket — ignore
       AppLogger.error(
         'SocketService',
         'onConnectError: 连接失败（请检查网络与服务状态）',
@@ -203,16 +234,19 @@ class SocketService {
     });
 
     socket.onError((error) {
+      if (_socket != socket) return; // Stale socket — ignore
       AppLogger.error('SocketService', 'onError: Socket 错误', error);
       _connectionStatusController.add(SocketConnectionStatus.error);
     });
 
     socket.onReconnect((_) {
+      if (_socket != socket) return; // Stale socket — ignore
       AppLogger.info('SocketService', 'onReconnect: 重连成功');
       _connectionStatusController.add(SocketConnectionStatus.connected);
     });
 
     socket.onReconnecting((_) {
+      if (_socket != socket) return; // Stale socket — ignore
       AppLogger.info('SocketService', 'onReconnecting: 正在重连...');
       _connectionStatusController.add(SocketConnectionStatus.reconnecting);
     });
@@ -221,9 +255,15 @@ class SocketService {
     // Inbound event: terminal output from the host agent
     // ------------------------------------------------------------------
     socket.on('terminal:output', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
       try {
         final map = _toMap(data);
         if (map != null) {
+          final seq = (map['seq'] as num?)?.toInt();
+          final dataStr = map['data'] as String? ?? '';
+          if (seq != null && seq % 50 == 0) {
+            AppLogger.info('SocketService', '收到 terminal:output seq=$seq bytes=${dataStr.length}');
+          }
           _terminalOutputController.add(TerminalOutput.fromJson(map));
         }
       } catch (e) {
@@ -232,12 +272,31 @@ class SocketService {
     });
 
     // ------------------------------------------------------------------
-    // Inbound event: Claude interactive prompt detected
+    // Inbound event: terminal snapshot from the server
     // ------------------------------------------------------------------
-    socket.on('claude:prompt', (data) {
+    socket.on('terminal:snapshot', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
       try {
         final map = _toMap(data);
         if (map != null) {
+          final snapshot = map['snapshot'] as String? ?? '';
+          AppLogger.info('SocketService', '收到 terminal:snapshot bytes=${snapshot.length}');
+          _terminalSnapshotController.add(TerminalSnapshot.fromJson(map));
+        }
+      } catch (e) {
+        debugPrint('[SocketService] Error parsing terminal:snapshot: $e');
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // Inbound event: Claude interactive prompt detected
+    // ------------------------------------------------------------------
+    socket.on('claude:prompt', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
+      try {
+        final map = _toMap(data);
+        if (map != null) {
+          AppLogger.info('SocketService', '收到 claude:prompt type=${map['promptType']}');
           _claudePromptsController.add(ClaudePrompt.fromJson(map));
         }
       } catch (e) {
@@ -249,9 +308,11 @@ class SocketService {
     // Inbound event: session lifecycle state change
     // ------------------------------------------------------------------
     socket.on('session:state', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
       try {
         final map = _toMap(data);
         if (map != null) {
+          AppLogger.info('SocketService', '收到 session:state state=${map['state']}');
           _sessionStatesController.add(SessionStateEvent.fromJson(map));
         }
       } catch (e) {
@@ -263,6 +324,7 @@ class SocketService {
     // Inbound event: pairing confirmed
     // ------------------------------------------------------------------
     socket.on('session:pair', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
       try {
         AppLogger.info('SocketService', 'session:pair: 配对成功');
         final map = _toMap(data);
@@ -278,6 +340,7 @@ class SocketService {
     // Inbound event: server error
     // ------------------------------------------------------------------
     socket.on('session:error', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
       try {
         AppLogger.error(
           'SocketService',
@@ -294,13 +357,42 @@ class SocketService {
     });
 
     socket.on('runtime:status', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
       try {
         final map = _toMap(data);
         if (map != null) {
+          AppLogger.info('SocketService', '收到 runtime:status ready=${map['ready']}');
           _runtimeStatusController.add(RuntimeStatusEvent.fromJson(map));
         }
       } catch (e) {
         AppLogger.error('SocketService', '解析 runtime:status 失败', e);
+      }
+    });
+
+    // Desktop daemon health updates (forwarded by server from desktop daemon)
+    socket.on('desktop:status:update', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
+      try {
+        final map = _toMap(data);
+        if (map != null) {
+          AppLogger.info('SocketService', '收到 desktop:status:update');
+          _desktopStatusController.add(map);
+        }
+      } catch (e) {
+        AppLogger.error('SocketService', '解析 desktop:status:update 失败', e);
+      }
+    });
+
+    // Session deleted by either side
+    socket.on('session:deleted', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
+      try {
+        final map = _toMap(data);
+        if (map != null) {
+          _sessionDeletedController.add(map);
+        }
+      } catch (e) {
+        AppLogger.error('SocketService', '解析 session:deleted 失败', e);
       }
     });
   }

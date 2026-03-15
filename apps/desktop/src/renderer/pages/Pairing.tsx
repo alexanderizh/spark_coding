@@ -74,7 +74,24 @@ export function PairingPage(): React.ReactElement {
     setQrInfo(null)
   }, [])
 
+  const handleRefresh = useCallback(async () => {
+    const s = await window.api.getSessionStatus()
+    setStatus({ status: s.status })
+    if (s.qrInfo) void generateQr(s.qrInfo)
+  }, [generateQr])
+
+  const handleRestartClaude = useCallback(async () => {
+    const res = await window.api.restartClaude()
+    if (res.error) setErrorMsg(res.error)
+    else setErrorMsg('')
+  }, [])
+
+  const handleRelaunch = useCallback(() => {
+    window.api.relaunchApp()
+  }, [])
+
   const isRunning = !['idle', 'stopped', 'error', 'expired'].includes(status.status)
+  const isPaired = status.status === 'paired'
 
   return (
     <>
@@ -107,7 +124,7 @@ export function PairingPage(): React.ReactElement {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
             {!isRunning ? (
               <button
                 className="btn btn--primary"
@@ -127,6 +144,22 @@ export function PairingPage(): React.ReactElement {
                 重试
               </button>
             )}
+
+            {isRunning && (
+              <button className="btn btn--ghost" onClick={handleRefresh} title="刷新连接状态">
+                刷新状态
+              </button>
+            )}
+
+            {isPaired && (
+              <button className="btn btn--ghost" onClick={handleRestartClaude} title="重启 Claude CLI 进程">
+                重启 Claude
+              </button>
+            )}
+
+            <button className="btn btn--ghost" onClick={handleRelaunch} title="重启应用">
+              重启应用
+            </button>
           </div>
         </div>
       </div>

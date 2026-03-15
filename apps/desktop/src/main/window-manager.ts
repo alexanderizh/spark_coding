@@ -1,8 +1,17 @@
-import { BrowserWindow, shell } from 'electron'
+import { BrowserWindow, shell, nativeImage } from 'electron'
 import { join } from 'path'
 
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
+
+const iconPath = join(__dirname, '../../resources/icon.png')
+
+function getWindowIcon(): Electron.NativeImage {
+  const img = nativeImage.createFromPath(iconPath)
+  if (img.isEmpty()) return img
+  // 固定 32x32，避免任务栏/标题栏显示为一大块
+  return img.resize({ width: 32, height: 32 })
+}
 
 export function setQuitting(v: boolean): void {
   isQuitting = v
@@ -10,12 +19,13 @@ export function setQuitting(v: boolean): void {
 
 export function createMainWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
-    width: 860,
-    height: 620,
+    width: 1060,
+    height: 720,
     minWidth: 720,
     minHeight: 500,
     title: 'Spark Coder',
-    backgroundColor: '#0f0f14',
+    icon: getWindowIcon(),
+    backgroundColor: '#ffffff',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

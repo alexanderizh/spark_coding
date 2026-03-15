@@ -1,0 +1,75 @@
+2026-03-15 12:53:36.865 INFO 84501 [relay] 连接请求 socketId=s6tji-i7V56zl6NBAAAB role=agent
+2026-03-15 12:53:36.891 INFO 84501 [relay] 连接成功 socketId=s6tji-i7V56zl6NBAAAB role=agent sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4
+2026-03-15 12:53:36.917 INFO 84501 [relay] 收到 desktop:status:report sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4 deviceId=175236ffb9d93e8b2f3817815e174b43 ->mobile
+2026-03-15 12:53:36.928 INFO 84501 [relay] 收到 agent:register socketId=s6tji-i7V56zl6NBAAAB hostname=zyMac.local
+2026-03-15 12:53:36.929 INFO 84501 [relay] 收到 runtime:status sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4 ready=true ->mobile
+2026-03-15 12:53:36.929 INFO 84501 [relay] 收到 desktop:status:report sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4 deviceId=175236ffb9d93e8b2f3817815e174b43 ->mobile
+2026-03-15 12:53:52.988 INFO 84501 [relay] 断开连接 socketId=s6tji-i7V56zl6NBAAAB role=agent sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4 reason=server shutting down
+2026-03-15 12:54:02.285 INFO 85462 [relay] 连接请求 socketId=0VsUD0vbRaElqyzdAAAB role=agent
+2026-03-15 12:54:02.333 INFO 85462 [relay] 连接成功 socketId=0VsUD0vbRaElqyzdAAAB role=agent sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4
+2026-03-15 12:54:02.368 INFO 85462 [relay] 收到 agent:register socketId=0VsUD0vbRaElqyzdAAAB hostname=zyMac.local
+2026-03-15 12:54:02.415 INFO 85462 [relay] 收到 runtime:status sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4 ready=true ->mobile
+2026-03-15 12:54:02.416 INFO 85462 [relay] 收到 desktop:status:report sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4 deviceId=175236ffb9d93e8b2f3817815e174b43 ->mobile
+2026-03-15 12:54:08.753 INFO 85462 [relay] 断开连接 socketId=0VsUD0vbRaElqyzdAAAB role=agent sessionId=12775660-fd0c-4ccd-a52a-32badc1783f4 reason=server shutting down
+2026-03-15 13:02:15.115 WARN 96550 [-//-/1856ms POST /api/device/status] BadRequestError: request aborted, check bodyParser config
+    at IncomingMessage.onAborted (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/raw-body/index.js:245:10)
+    at IncomingMessage.emit (node:events:518:28)
+    at IncomingMessage._destroy (node:_http_incoming:221:10)
+    at _destroy (node:internal/streams/destroy:122:10)
+    at IncomingMessage.destroy (node:internal/streams/destroy:84:5)
+    at abortIncoming (node:_http_server:811:9)
+    at socketOnClose (node:_http_server:805:3)
+    at Socket.emit (node:events:530:35)
+    at TCP.<anonymous> (node:net:346:12) {
+  code: 'ECONNABORTED',
+  expected: 286,
+  length: 286,
+  received: 286,
+  type: 'request.aborted',
+  headerSent: true
+}
+2026-03-15 15:11:59.100 WARN 60588 [-//-/2187ms POST /api/device/status] BadRequestError: request aborted, check bodyParser config
+    at IncomingMessage.onAborted (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/raw-body/index.js:245:10)
+    at IncomingMessage.emit (node:events:518:28)
+    at IncomingMessage._destroy (node:_http_incoming:221:10)
+    at _destroy (node:internal/streams/destroy:122:10)
+    at IncomingMessage.destroy (node:internal/streams/destroy:84:5)
+    at abortIncoming (node:_http_server:811:9)
+    at socketOnClose (node:_http_server:805:3)
+    at Socket.emit (node:events:530:35)
+    at TCP.<anonymous> (node:net:346:12) {
+  code: 'ECONNABORTED',
+  expected: 285,
+  length: 285,
+  received: 285,
+  type: 'request.aborted',
+  headerSent: true
+}
+2026-03-15 15:12:09.294 ERROR 61528 [-/::ffff:192.168.1.10/-/86ms POST /api/device/status] QueryFailedError: Can't add new command when connection is in closed state
+    at Query.onResult (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:248:33)
+    at PoolConnection._addCommandClosedState (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:164:11)
+    at PoolConnection.query (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:604:17)
+    at /Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:209:36
+    at new Promise (<anonymous>)
+    at MysqlQueryRunner.query (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:199:16)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at MysqlQueryRunner.startTransaction (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:128:13)
+    at EntityPersistExecutor.execute (/Users/zhangyang/spark_ai_project/spark_coding/src/persistence/EntityPersistExecutor.ts:175:25)
+    at DeviceService.upsertDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/device.service.ts:66:5) {
+  query: 'START TRANSACTION',
+  parameters: undefined,
+  driverError: Error: Can't add new command when connection is in closed state
+      at PoolConnection._addCommandClosedState (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:159:17)
+      at PoolConnection.query (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:604:17)
+      at /Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:209:36
+      at new Promise (<anonymous>)
+      at MysqlQueryRunner.query (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:199:16)
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at MysqlQueryRunner.startTransaction (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:128:13)
+      at EntityPersistExecutor.execute (/Users/zhangyang/spark_ai_project/spark_coding/src/persistence/EntityPersistExecutor.ts:175:25)
+      at DeviceService.upsertDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/device.service.ts:66:5)
+      at SessionController.reportDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/controller/session.controller.ts:182:5) {
+    fatal: true
+  },
+  fatal: true
+}

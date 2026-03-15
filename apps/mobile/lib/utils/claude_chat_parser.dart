@@ -121,10 +121,10 @@ class ClaudeChatParser {
     ).hasMatch(line);
   }
 
-  /// Strips Claude CLI's response-indicator prefix characters (e.g. ⏺) that
+  /// Strips Claude CLI's response-indicator prefix characters (e.g. ⏺, ✽) that
   /// appear at the start of response lines but are not part of the content.
   String _stripResponseIndicatorPrefix(String line) {
-    return line.replaceFirst(RegExp(r'^[⏺]\s*'), '');
+    return line.replaceFirst(RegExp(r'^[⏺✽]\s*'), '');
   }
 
   bool _isDecorationLine(String line) {
@@ -177,16 +177,25 @@ class ClaudeChatParser {
   }
 
   String _resolveCarriageReturns(String value) {
-    // Claude CLI renders the input prompt via "\r❯ ..." after the response text
-    // on the same raw line. Strip that suffix so the response text is preserved.
-    final stripped = value.replaceAll(RegExp(r'\r[❯>?][^\n]*'), '');
-    return stripped
-        .split('\n')
-        .map((line) {
-          if (!line.contains('\r')) return line;
-          return line.substring(line.lastIndexOf('\r') + 1);
-        })
-        .join('\n');
+    final resolved = value.split('\n').map((line) {
+      if (!line.contains('\r')) return line;
+
+      // Work backwards through \r positions, finding the first one with
+      // non-empty content after it.
+      var idx = line.length;
+      while (idx > 0) {
+        final rIdx = line.lastIndexOf('\r', idx - 1);
+        if (rIdx == -1) break;
+        final after = line.substring(rIdx + 1);
+        if (after.trim().isNotEmpty) return after;
+        idx = rIdx;
+      }
+      // Fallback: take content after the first \r if it exists
+      return line.substring(line.indexOf('\r') + 1);
+    }).join('\n');
+
+    // Then strip prompt lines like "❯ ..." that are now at line start
+    return resolved.replaceAll(RegExp(r'^[❯>][^\n]*$', multiLine: true), '');
   }
 
   String _stripDanglingPrivateModeTokens(String value) {

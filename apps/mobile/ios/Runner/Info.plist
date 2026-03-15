@@ -76,7 +76,7 @@
 				<string>sparkcoder</string>
 			</array>
 		</dict>
-	</dict>
+	</array>
 
 	<!-- Local network usage description (iOS 14+) — required when
 	     connecting to devices on the local network. -->

@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 typedef MessageCallback = void Function(String text);
+typedef RawInputCallback = void Function(String sequence);
 
 class InputToolbar extends StatefulWidget {
   const InputToolbar({
     super.key,
     required this.onSendMessage,
     this.onTypingChanged,
+    this.onRawInput,
   });
 
   final MessageCallback onSendMessage;
   final ValueChanged<bool>? onTypingChanged;
+  /// Sends a raw terminal sequence (no \r appended).
+  final RawInputCallback? onRawInput;
 
   @override
   State<InputToolbar> createState() => _InputToolbarState();
@@ -34,6 +38,17 @@ class _InputToolbarState extends State<InputToolbar> {
     (command: '/permissions', title: '权限设置', desc: '查看工具权限状态'),
     (command: '/review', title: '代码审查', desc: '让 Claude 审查当前改动'),
     (command: '/init', title: '初始化', desc: '初始化当前工作区能力'),
+  ];
+
+  // Key shortcuts: label → raw terminal sequence
+  static const _keyShortcuts = <({String label, String seq, IconData? icon})>[
+    (label: 'Esc', seq: '\x1b',   icon: null),
+    (label: '↑',   seq: '\x1b[A', icon: null),
+    (label: '↓',   seq: '\x1b[B', icon: null),
+    (label: '←',   seq: '\x1b[D', icon: null),
+    (label: '→',   seq: '\x1b[C', icon: null),
+    (label: 'Tab', seq: '\t',     icon: null),
+    (label: '⏎',   seq: '\r',     icon: null),
   ];
 
   @override
@@ -64,6 +79,11 @@ class _InputToolbarState extends State<InputToolbar> {
     widget.onTypingChanged?.call(false);
     HapticFeedback.selectionClick();
     _focusNode.requestFocus();
+  }
+
+  void _sendRaw(String seq) {
+    widget.onRawInput?.call(seq);
+    HapticFeedback.selectionClick();
   }
 
   Future<void> _showCommandSheet() async {
@@ -137,6 +157,42 @@ class _InputToolbarState extends State<InputToolbar> {
     _focusNode.requestFocus();
   }
 
+  Widget _buildKeyBar() {
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        itemCount: _keyShortcuts.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final key = _keyShortcuts[index];
+          return GestureDetector(
+            onTap: () => _sendRaw(key.seq),
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: const Color(0xFFDDDDDD)),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                key.label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -147,75 +203,82 @@ class _InputToolbarState extends State<InputToolbar> {
       padding: EdgeInsets.only(
         left: 10,
         right: 10,
-        top: 8,
-        bottom: MediaQuery.of(context).padding.bottom + 8,
+        top: 6,
+        bottom: MediaQuery.of(context).padding.bottom + 6,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            onPressed: _showCommandSheet,
-            icon: const Icon(Icons.terminal, color: Colors.black54),
-            splashRadius: 22,
-            tooltip: '命令',
-          ),
-          Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: const Color(0xFFE0E0E0)),
+          _buildKeyBar(),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              IconButton(
+                onPressed: _showCommandSheet,
+                icon: const Icon(Icons.terminal, color: Colors.black54),
+                splashRadius: 22,
+                tooltip: '命令',
               ),
-              child: TextField(
-                controller: _textController,
-                focusNode: _focusNode,
-                minLines: 1,
-                maxLines: 12,
-                textInputAction: TextInputAction.newline,
-                onSubmitted: (_) => _send(),
-                onTapOutside: (_) => _focusNode.unfocus(),
-                onChanged: (value) {
-                  final next = value.trim().isNotEmpty;
-                  if (next != _hasText) {
-                    setState(() => _hasText = next);
-                    widget.onTypingChanged?.call(next);
-                  }
-                },
-                decoration: const InputDecoration(
-                  hintText: '输入消息',
-                  filled: false,
-                  fillColor: Colors.transparent,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+              Expanded(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                  ),
+                  child: TextField(
+                    controller: _textController,
+                    focusNode: _focusNode,
+                    minLines: 1,
+                    maxLines: 12,
+                    textInputAction: TextInputAction.newline,
+                    onSubmitted: (_) => _send(),
+                    onTapOutside: (_) => _focusNode.unfocus(),
+                    onChanged: (value) {
+                      final next = value.trim().isNotEmpty;
+                      if (next != _hasText) {
+                        setState(() => _hasText = next);
+                        widget.onTypingChanged?.call(next);
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      hintText: '输入消息',
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    style: const TextStyle(fontSize: 15, color: Colors.black87),
+                  ),
                 ),
-                style: const TextStyle(fontSize: 15, color: Colors.black87),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 42,
-            height: 42,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: _hasText ? Colors.black : const Color(0xFF9E9E9E),
-                shape: BoxShape.circle,
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 42,
+                height: 42,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _hasText ? Colors.black : const Color(0xFF9E9E9E),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: _hasText ? _send : null,
+                    icon: Icon(_hasText ? Icons.send_rounded : Icons.mic_none),
+                    color: Colors.white,
+                    splashRadius: 20,
+                    tooltip: _hasText ? '发送' : '语音',
+                  ),
+                ),
               ),
-              child: IconButton(
-                onPressed: _hasText ? _send : null,
-                icon: Icon(_hasText ? Icons.send_rounded : Icons.mic_none),
-                color: Colors.white,
-                splashRadius: 20,
-                tooltip: _hasText ? '发送' : '语音',
-              ),
-            ),
+            ],
           ),
         ],
       ),

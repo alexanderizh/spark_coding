@@ -2,3 +2,98 @@
 2026-03-15 01:39:07.969 INFO 69919 [midway:socketio] Socket.io server start success and attach to web server
 2026-03-15 09:49:32.439 INFO 94032 [midway:socketio] Socket.io server start success and attach to web server
 2026-03-15 09:49:42.863 INFO 94767 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 10:49:51.392 INFO 65239 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 11:57:02.557 INFO 32833 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:38:23.158 ERROR 32833 QueryFailedError: Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'
+    at Query.onResult (/Users/zhangyang/spark_ai_project/spark_coding/src/driver/mysql/MysqlQueryRunner.ts:248:33)
+    at Query.execute (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/commands/command.js:36:14)
+    at PoolConnection.handlePacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:508:34)
+    at PacketParser.onPacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:93:12)
+    at PacketParser.executeStart (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/packet_parser.js:75:16)
+    at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:100:25)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Socket.Readable.push (node:internal/streams/readable:392:5) {
+  query: 'UPDATE `sessions` SET `connection_key` = ?, `mobile_device_id` = ?, `desktop_device_id` = ?, `tokens` = ?, `expires_at` = ?, `last_activity_at` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9c87eb_claude',
+    'c93df8f1-25f2-4362-93ef-46202d9c87eb',
+    '175236ffb9d93e8b2f3817815e174b43',
+    '["386dfb77361cbce14a2891f553fdb5a98af6012d0c6ba935fc801619a8fe72ae"]',
+    null,
+    2026-03-15T04:38:23.131Z,
+    '7435740d-8e03-4e88-857f-c6c42dd9e300'
+  ],
+  driverError: Error: Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'
+      at Packet.asError (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/packets/packet.js:788:17)
+      at Query.execute (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/commands/command.js:29:26)
+      at PoolConnection.handlePacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:508:34)
+      at PacketParser.onPacket (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:93:12)
+      at PacketParser.executeStart (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/packet_parser.js:75:16)
+      at Socket.<anonymous> (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/node_modules/mysql2/lib/base/connection.js:100:25)
+      at Socket.emit (node:events:518:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Socket.Readable.push (node:internal/streams/readable:392:5) {
+    code: 'ER_DUP_ENTRY',
+    errno: 1062,
+    sqlState: '23000',
+    sqlMessage: "Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'",
+    sql: 'UPDATE `sessions` SET `connection_key` = \'175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9c87eb_claude\', `mobile_device_id` = \'c93df8f1-25f2-4362-93ef-46202d9c87eb\', `desktop_device_id` = \'175236ffb9d93e8b2f3817815e174b43\', `tokens` = \'[\\"386dfb77361cbce14a2891f553fdb5a98af6012d0c6ba935fc801619a8fe72ae\\"]\', `expires_at` = NULL, `last_activity_at` = \'2026-03-15 04:38:23.131\', `updated_at` = CURRENT_TIMESTAMP WHERE `id` IN (\'7435740d-8e03-4e88-857f-c6c42dd9e300\')'
+  },
+  code: 'ER_DUP_ENTRY',
+  errno: 1062,
+  sqlState: '23000',
+  sqlMessage: "Duplicate entry '175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9' for key 'sessions.IDX_c2ad7f51bf1b232cffe67ccd88'",
+  sql: 'UPDATE `sessions` SET `connection_key` = \'175236ffb9d93e8b2f3817815e174b43_c93df8f1-25f2-4362-93ef-46202d9c87eb_claude\', `mobile_device_id` = \'c93df8f1-25f2-4362-93ef-46202d9c87eb\', `desktop_device_id` = \'175236ffb9d93e8b2f3817815e174b43\', `tokens` = \'[\\"386dfb77361cbce14a2891f553fdb5a98af6012d0c6ba935fc801619a8fe72ae\\"]\', `expires_at` = NULL, `last_activity_at` = \'2026-03-15 04:38:23.131\', `updated_at` = CURRENT_TIMESTAMP WHERE `id` IN (\'7435740d-8e03-4e88-857f-c6c42dd9e300\')'
+}
+2026-03-15 12:46:57.765 INFO 77049 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:47:33.251 INFO 78404 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:52:33.823 INFO 83545 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:53:22.482 INFO 84346 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:53:27.522 INFO 84451 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:53:29.892 INFO 84501 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:54:00.097 INFO 85462 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:54:21.472 INFO 86191 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 12:56:32.388 INFO 89345 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:02:06.686 INFO 96550 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:02:17.342 INFO 96751 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:02:27.491 INFO 96939 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:04:19.371 INFO 99274 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:04:29.121 INFO 99816 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:12:05.583 INFO 7106 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:13:55.524 INFO 9191 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:14:07.186 INFO 9849 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:17:15.318 INFO 14010 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:18:00.910 INFO 15291 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:22:39.962 INFO 19756 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:23:38.120 INFO 21529 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:35:40.842 INFO 33493 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 13:43:35.464 INFO 41866 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 14:36:06.873 INFO 94461 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 14:47:51.665 INFO 9967 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 14:54:28.046 INFO 17562 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 14:56:11.649 INFO 19056 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:06:04.724 INFO 37312 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:11:49.404 INFO 60588 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:12:04.687 INFO 61528 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:15:40.672 INFO 75337 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:16:17.038 INFO 77725 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:16:40.271 INFO 78209 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:17:31.761 INFO 79982 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:18:09.987 INFO 81582 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:19:03.357 INFO 83693 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:38:02.987 INFO 5406 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:43:17.798 INFO 10687 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:44:46.532 INFO 12707 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:48:22.332 INFO 16744 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:49:55.805 INFO 18241 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 15:50:20.376 INFO 19117 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 16:01:05.128 INFO 30897 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 16:13:47.104 INFO 43995 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 16:13:53.465 INFO 44167 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 16:17:29.294 INFO 49572 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 16:22:15.662 INFO 56352 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 16:23:00.609 INFO 58178 [midway:socketio] Socket.io server start success and attach to web server
+2026-03-15 16:31:24.323 INFO 71388 [midway:socketio] Socket.io server start success and attach to web server

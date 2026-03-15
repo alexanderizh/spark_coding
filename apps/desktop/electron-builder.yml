@@ -20,7 +20,7 @@ mac:
       arch: [x64, arm64]
     - target: zip
       arch: [x64, arm64]
-  # icon: resources/icon.icns   # uncomment after adding icon
+  icon: resources/icon.png
   category: public.app-category.developer-tools
   hardenedRuntime: false
   gatekeeperAssess: false
@@ -31,7 +31,7 @@ win:
       arch: [x64]
     - target: portable
       arch: [x64]
-  # icon: resources/icon.ico    # uncomment after adding icon
+  icon: resources/icon.png
 
 nsis:
   oneClick: false

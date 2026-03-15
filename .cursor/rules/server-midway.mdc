@@ -29,6 +29,11 @@ alwaysApply: false
 - `mobile:join` 不应在 agent 未连接时直接报错中断；应允许进入 `WAITING_FOR_AGENT`，待 agent 注册后自动补发 `session:pair`
 - `agent:register` 若检测到 `mobileSocketId` 已存在，应直接升级 `PAIRED` 并广播 `session:pair`，避免“双方在线但一直等待配对”
 
+## 中继通信日志
+
+- `relay.controller.ts` 在各事件处理处使用 `this.log()` 打印 `[relay]` 前缀日志，便于排查主机端、客户端、服务端之间的通信问题
+- `terminal:output` 因频率高，仅每 50 条打印一次
+
 ## TypeORM + better-sqlite3
 
 - 实体列需显式指定 `type`，避免 "Data type Object not supported" 错误

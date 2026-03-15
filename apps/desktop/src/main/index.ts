@@ -1,3 +1,10 @@
+import { config as loadEnv } from 'dotenv'
+import { resolve } from 'path'
+
+// 加载 .env：优先 apps/desktop/.env，其次项目根目录 .env
+loadEnv({ path: resolve(process.cwd(), '.env') })
+loadEnv({ path: resolve(process.cwd(), 'apps/desktop/.env') })
+
 import { app } from 'electron'
 import { createMainWindow, showMainWindow, setQuitting } from './window-manager'
 import { createTray } from './tray'

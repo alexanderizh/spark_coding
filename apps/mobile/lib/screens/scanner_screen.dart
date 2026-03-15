@@ -89,18 +89,19 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         return;
       }
 
-      final (token, serverUrl, sessionId) = parsed;
+      final (token, serverUrl, sessionId, desktopDeviceId) = parsed;
       AppLogger.info(
         'Scanner',
-        '解析成功 — sessionId: $sessionId, token长度: ${token.length}',
+        '解析成功 — sessionId: $sessionId, token长度: ${token.length}, desktopDeviceId: ${desktopDeviceId ?? "none"}',
       );
 
       final savedLink = await ref
           .read(linkNotifierProvider.notifier)
           .saveFromScan(
-            serverUrl: serverUrl,
-            token: token,
-            sessionId: sessionId,
+            serverUrl:       serverUrl,
+            token:           token,
+            sessionId:       sessionId,
+            desktopDeviceId: desktopDeviceId,
           );
       AppLogger.info('Scanner', '会话已保存');
 
@@ -135,22 +136,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     }
   }
 
-  /// Parses a `sparkcoder://pair?token=TOKEN&server=SERVER_URL&session=ID`
-  /// URL and returns a (token, serverUrl, sessionId) tuple, or null if the URL
-  /// is not in the expected format.
-  ///
-  /// The `session` query parameter is optional; if absent, the token is used
-  /// as the session identifier (the relay server maps tokens to session IDs).
-  (String, String, String)? _parseRemoteClaudeUrl(String raw) {
+  /// Parses a `sparkcoder://pair?token=TOKEN&server=SERVER_URL&did=DESKTOP_ID`
+  /// URL. Returns a (token, serverUrl, sessionId, desktopDeviceId?) tuple.
+  (String, String, String, String?)? _parseRemoteClaudeUrl(String raw) {
     try {
       final uri = Uri.parse(raw);
 
       if (uri.scheme != 'sparkcoder') {
-        AppLogger.warn(
-          'Scanner',
-          '解析失败: scheme 不是 sparkcoder',
-          'scheme=${uri.scheme}',
-        );
+        AppLogger.warn('Scanner', '解析失败: scheme 不是 sparkcoder', 'scheme=${uri.scheme}');
         return null;
       }
       if (uri.host != 'pair') {
@@ -158,7 +151,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         return null;
       }
 
-      final token = uri.queryParameters['token'];
+      final token  = uri.queryParameters['token'];
       final server = uri.queryParameters['server'];
 
       if (token == null || token.isEmpty) {
@@ -170,24 +163,18 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         return null;
       }
 
-      // session parameter is optional — some server implementations embed the
-      // session ID directly in the QR code.
-      final sessionId = uri.queryParameters['session'] ?? token;
+      final sessionId        = uri.queryParameters['session'] ?? token;
+      final desktopDeviceId  = uri.queryParameters['did'];
 
       // Validate the server URL.
       final serverUri = Uri.parse(server);
       if (!serverUri.hasScheme ||
-          (!serverUri.scheme.startsWith('http') &&
-              !serverUri.scheme.startsWith('ws'))) {
-        AppLogger.warn(
-          'Scanner',
-          '解析失败: server URL 格式无效',
-          'scheme=${serverUri.scheme}',
-        );
+          (!serverUri.scheme.startsWith('http') && !serverUri.scheme.startsWith('ws'))) {
+        AppLogger.warn('Scanner', '解析失败: server URL 格式无效', 'scheme=${serverUri.scheme}');
         return null;
       }
 
-      return (token, server, sessionId);
+      return (token, server, sessionId, desktopDeviceId);
     } catch (e, st) {
       AppLogger.error('Scanner', '解析 URL 异常', e, st);
       return null;
@@ -229,13 +216,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     return SafeArea(
       child: Column(
         children: [
-          // Top bar
+          // Top bar — 返回按钮颜色随背景变化：无权限时白底用深色，有权限时黑底用白色
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                  icon: Icon(
+                    Icons.arrow_back_ios,
+                    color: _hasPermission ? Colors.white : Colors.black87,
+                  ),
                   onPressed: () {
                     if (context.canPop()) {
                       context.pop();

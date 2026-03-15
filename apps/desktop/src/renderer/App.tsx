@@ -1,14 +1,17 @@
 import React, { useState } from 'react'
 import { PairingPage } from './pages/Pairing'
+import logoIcon from './assets/logo.png'
 import { SessionPage } from './pages/Session'
 import { SettingsPage } from './pages/Settings'
+import { ConnectionsPage } from './pages/Connections'
 
-type Page = 'pairing' | 'session' | 'settings'
+type Page = 'pairing' | 'session' | 'connections' | 'settings'
 
 const NAV: { id: Page; icon: string; label: string }[] = [
-  { id: 'pairing',  icon: '📡', label: '配对' },
-  { id: 'session',  icon: '💬', label: '会话' },
-  { id: 'settings', icon: '⚙️', label: '设置' },
+  { id: 'pairing',     icon: '📡', label: '配对' },
+  { id: 'session',     icon: '💬', label: '会话' },
+  { id: 'connections', icon: '🔗', label: '连接' },
+  { id: 'settings',    icon: '⚙️', label: '设置' },
 ]
 
 export default function App(): React.ReactElement {
@@ -19,7 +22,7 @@ export default function App(): React.ReactElement {
       {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar__logo">
-          <div className="sidebar__logo-icon">⚡</div>
+          <img src={logoIcon} alt="" className="sidebar__logo-icon" width={28} height={28} />
           <span className="sidebar__logo-name">Spark Coder</span>
         </div>
 
@@ -39,9 +42,10 @@ export default function App(): React.ReactElement {
 
       {/* ── Content ── */}
       <main className="content">
-        {page === 'pairing'  && <PairingPage />}
-        {page === 'session'  && <SessionPage />}
-        {page === 'settings' && <SettingsPage />}
+        {page === 'pairing'     && <PairingPage />}
+        {page === 'session'     && <SessionPage />}
+        {page === 'connections' && <ConnectionsPage />}
+        {page === 'settings'    && <SettingsPage />}
       </main>
     </div>
   )

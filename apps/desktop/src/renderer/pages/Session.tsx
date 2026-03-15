@@ -1,13 +1,87 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
 import type { StatusInfo, QrInfo } from '../types.d'
 
 export function SessionPage(): React.ReactElement {
   const [status, setStatus] = useState<StatusInfo>({ status: 'idle' })
   const [qrInfo, setQrInfo] = useState<QrInfo | null>(null)
   const [pairedAt, setPairedAt] = useState<number | null>(null)
-  const [outputLines, setOutputLines] = useState<string[]>([])
-  const outputRef = useRef<HTMLDivElement>(null)
+  const [logs, setLogs] = useState<string>('')
+  const termRef = useRef<HTMLDivElement>(null)
+  const logsRef = useRef<HTMLDivElement>(null)
+  const xtermRef = useRef<Terminal | null>(null)
+  const fitRef = useRef<FitAddon | null>(null)
 
+  // Initialize xterm once
+  useEffect(() => {
+    if (!termRef.current) return
+
+    const term = new Terminal({
+      theme: {
+        background:    '#1a1a1a',
+        foreground:    '#e0e0e0',
+        cursor:        '#e0e0e0',
+        selectionBackground: 'rgba(255,255,255,0.2)',
+        black:         '#1a1a1a',
+        brightBlack:   '#555',
+        red:           '#e06c75',
+        brightRed:     '#e06c75',
+        green:         '#98c379',
+        brightGreen:   '#98c379',
+        yellow:        '#e5c07b',
+        brightYellow:  '#e5c07b',
+        blue:          '#61afef',
+        brightBlue:    '#61afef',
+        magenta:       '#c678dd',
+        brightMagenta: '#c678dd',
+        cyan:          '#56b6c2',
+        brightCyan:    '#56b6c2',
+        white:         '#abb2bf',
+        brightWhite:   '#e0e0e0',
+      },
+      fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+      fontSize:   13,
+      lineHeight: 1.4,
+      cursorBlink: false,
+      scrollback: 5000,
+      convertEol: false,
+    })
+
+    const fit = new FitAddon()
+    term.loadAddon(fit)
+    term.open(termRef.current)
+    fit.fit()
+
+    xtermRef.current = term
+    fitRef.current   = fit
+
+    // Fetch buffered output on mount
+    window.api.getOutputBuffer().then((buf) => {
+      if (buf) term.write(buf)
+    })
+
+    // Fetch initial logs
+    window.api.getLogBuffer().then((buf) => {
+      setLogs(buf)
+      if (logsRef.current) {
+        logsRef.current.scrollTop = logsRef.current.scrollHeight
+      }
+    })
+
+    const ro = new ResizeObserver(() => fitRef.current?.fit())
+    ro.observe(termRef.current)
+
+    return () => {
+      ro.disconnect()
+      term.dispose()
+      xtermRef.current = null
+      fitRef.current   = null
+    }
+  }, [])
+
+  // Subscribe to IPC events
   useEffect(() => {
     window.api.getSessionStatus().then((s) => {
       setStatus({ status: s.status })
@@ -22,36 +96,44 @@ export function SessionPage(): React.ReactElement {
     const unQr = window.api.onQr((info) => setQrInfo(info))
 
     const unOutput = window.api.onOutput((data) => {
-      setOutputLines((prev) => {
-        // Keep last 200 lines for display
-        const next = [...prev, data]
-        return next.length > 200 ? next.slice(-200) : next
+      const term = xtermRef.current
+      if (!term) return
+      term.write(data, () => {
+        const snapshot = extractXtermViewport(term)
+        if (snapshot) window.api.reportXtermSnapshot(snapshot)
       })
     })
 
     const unExit = window.api.onClaudeExit((code) => {
-      setOutputLines((prev) => [...prev, `\n[Claude exited with code ${code}]\n`])
+      xtermRef.current?.write(`\r\n[Claude exited with code ${code}]\r\n`)
     })
 
-    return () => { unStatus(); unQr(); unOutput(); unExit() }
+    // Poll logs periodically
+    const logPollInterval = setInterval(() => {
+      window.api.getLogBuffer().then((buf) => {
+        setLogs(buf)
+        if (logsRef.current) {
+          logsRef.current.scrollTop = logsRef.current.scrollHeight
+        }
+      })
+    }, 500)
+
+    return () => {
+      unStatus()
+      unQr()
+      unOutput()
+      unExit()
+      clearInterval(logPollInterval)
+    }
   }, [])
 
-  // Auto-scroll output
-  useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight
-    }
-  }, [outputLines])
-
-  const uptime = pairedAt
-    ? formatDuration(Date.now() - pairedAt)
-    : '—'
+  const uptime = pairedAt ? formatDuration(Date.now() - pairedAt) : '—'
 
   return (
-    <>
+    <div className="session-page">
       <h2 className="page-title">会话详情</h2>
 
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <div className="info-row">
           <span className="info-row__label">连接状态</span>
           <span className={`status-badge status--${status.status}`}>
@@ -80,45 +162,59 @@ export function SessionPage(): React.ReactElement {
         </div>
       </div>
 
-      {/* Terminal output preview */}
-      <div className="card">
-        <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Terminal output */}
+      <div className="card session-output-card" style={{ display: 'flex', flexDirection: 'column', marginBottom: 16 }}>
+        <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-secondary)' }}>
-            终端输出预览
+            Claude CLI 输出
           </span>
           <button
             className="btn btn--ghost"
             style={{ padding: '4px 10px', fontSize: 12 }}
-            onClick={() => setOutputLines([])}
+            onClick={() => xtermRef.current?.clear()}
           >
             清除
           </button>
         </div>
 
         <div
-          ref={outputRef}
+          ref={termRef}
           style={{
-            background: 'var(--bg-app)',
+            flex: 1,
+            minHeight: 200,
             borderRadius: 6,
-            padding: '12px 14px',
-            height: 280,
-            overflowY: 'auto',
+            overflow: 'hidden',
+            background: '#1a1a1a',
+          }}
+        />
+      </div>
+
+      {/* System logs - fixed at bottom */}
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', maxHeight: '20vh' }}>
+        <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
+          系统日志（最新）
+        </div>
+        <div
+          ref={logsRef}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            padding: '8px 12px',
+            background: '#f5f5f5',
+            borderRadius: 6,
+            overflow: 'auto',
             fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-            fontSize: 12,
-            lineHeight: 1.6,
-            color: '#b0c4de',
+            fontSize: 11,
+            lineHeight: 1.4,
+            color: '#666',
             whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all',
+            wordBreak: 'break-word',
           }}
         >
-          {outputLines.length === 0 ? (
-            <span style={{ color: 'var(--text-muted)' }}>等待 Claude 输出…</span>
-          ) : (
-            outputLines.join('')
-          )}
+          {logs}
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -128,6 +224,20 @@ function statusLabel(s: string): string {
     paired: '已配对', error: '错误', expired: '已过期', stopped: '已停止',
   }
   return map[s] ?? s
+}
+
+/** Extract visible viewport text from an xterm Terminal instance. */
+function extractXtermViewport(term: Terminal): string {
+  const buffer = term.buffer.active
+  const lines: string[] = []
+  const start = buffer.viewportY
+  const end   = start + term.rows
+  for (let i = start; i < end; i++) {
+    const line = buffer.getLine(i)
+    lines.push(line ? line.translateToString(true) : '')
+  }
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop()
+  return lines.join('\n')
 }
 
 function formatDuration(ms: number): string {

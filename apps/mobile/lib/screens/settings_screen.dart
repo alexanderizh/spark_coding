@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../app/router.dart';
+import '../models/connection_link_model.dart';
+import '../models/session_model.dart';
 import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
@@ -144,26 +146,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildForm(BuildContext context) {
     final session = ref.watch(sessionProvider);
+    final sessionService = ref.watch(sessionServiceProvider);
+    final activeLink = sessionService.activeLink;
+    final mobileDeviceId = sessionService.deviceId;
 
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         // ----------------------------------------------------------------
-        // Connection section
+        // Connection section - 会话完整信息
         // ----------------------------------------------------------------
-        _sectionHeader('连接信息'),
+        _sectionHeader('会话信息'),
         const SizedBox(height: 12),
 
-        // Display-only fields for current session
-        if (session != null) ...[
-          _readOnlyField(label: '会话 ID', value: session.sessionId),
+        if (session != null || activeLink != null) ...[
+          _readOnlyField(
+            label: '会话 ID',
+            value: session?.sessionId ?? activeLink?.sessionId ?? '—',
+          ),
+          const SizedBox(height: 8),
+          _readOnlyField(
+            label: '主机 ID',
+            value: activeLink?.desktopDeviceId ?? '—',
+          ),
+          const SizedBox(height: 8),
+          _readOnlyField(
+            label: 'Mobile ID',
+            value: activeLink?.mobileDeviceId ?? mobileDeviceId ?? '—',
+          ),
+          const SizedBox(height: 8),
+          _readOnlyField(
+            label: '连接地址',
+            value: session?.serverUrl ?? activeLink?.serverUrl ?? '—',
+          ),
+          const SizedBox(height: 8),
+          _readOnlyField(
+            label: '主机名',
+            value: session?.agentHostname ?? activeLink?.hostName ?? '—',
+          ),
+          if (activeLink != null &&
+              (activeLink.connectionKey ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _readOnlyField(
+              label: '连接密钥',
+              value: activeLink.connectionKey!,
+            ),
+          ],
           const SizedBox(height: 8),
           _readOnlyField(
             label: '状态',
-            value: session
-                .state
-                .value, // You might want to map this to Chinese too
+            value: session?.state.label ?? activeLink?.status.label ?? '—',
           ),
+          if (session?.pairedAt != null) ...[
+            const SizedBox(height: 8),
+            _readOnlyField(
+              label: '配对时间',
+              value: DateTime.fromMillisecondsSinceEpoch(session!.pairedAt!)
+                  .toLocal()
+                  .toString(),
+            ),
+          ],
           const SizedBox(height: 16),
         ] else ...[
           Padding(
@@ -284,20 +326,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$label: ',
             style: const TextStyle(color: Colors.grey, fontSize: 13),
           ),
           Expanded(
-            child: Text(
+            child: SelectableText(
               value,
               style: const TextStyle(
                 color: Colors.black87,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

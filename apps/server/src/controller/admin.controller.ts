@@ -64,7 +64,7 @@ export class AdminController {
       mobileDeviceId: s.mobileDeviceId,
       pairedAt: s.pairedAt?.getTime() ?? null,
       lastActivityAt: s.lastActivityAt.getTime(),
-      expiresAt: s.expiresAt.getTime(),
+      expiresAt: s.expiresAt?.getTime() ?? null,
       createdAt: s.createdAt.getTime(),
     }));
 

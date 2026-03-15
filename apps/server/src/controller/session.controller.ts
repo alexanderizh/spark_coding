@@ -1,41 +1,64 @@
-import { Controller, Get, Post, Param, Inject } from '@midwayjs/decorator';
+import { Controller, Get, Post, Del, Query, Param, Body, Inject, App } from '@midwayjs/decorator';
 import { Context } from '@midwayjs/koa';
+import { Application } from '@midwayjs/socketio';
 import { SessionService } from '../service/session.service';
+import { DeviceService } from '../service/device.service';
 import { QrService } from '../service/qr.service';
-import { SessionErrorCode } from '@spark_coder/shared';
+import { SessionErrorCode, Events, SessionDeletedPayload } from '@spark_coder/shared';
 
 @Controller('/api')
 export class SessionController {
   @Inject()
   ctx: Context;
 
+  @App('socketIO')
+  socketApp: Application;
+
   @Inject()
   sessionService: SessionService;
 
   @Inject()
+  deviceService: DeviceService;
+
+  @Inject()
   qrService: QrService;
 
-  /** Create a new session. Returns sessionId, token, and the QR payload URL. */
+  /**
+   * Create a new session (called by Desktop on startup).
+   * If desktopDeviceId is provided, it's embedded into the QR URL.
+   */
   @Post('/session')
-  async createSession() {
+  async createSession(@Body() body: { desktopDeviceId?: string; launchType?: string } = {}) {
     const serverUrl = this.resolveServerUrl();
-    const { session, qrPayload } = await this.sessionService.createSession(serverUrl);
+    const { session, qrPayload } = await this.sessionService.createSession(serverUrl, {
+      desktopDeviceId: body.desktopDeviceId,
+      launchType:      body.launchType ?? 'claude',
+    });
+
+    // Register/touch the desktop device record
+    if (body.desktopDeviceId) {
+      await this.deviceService.upsertDevice({
+        id:       body.desktopDeviceId,
+        platform: 'desktop',
+      });
+    }
+
     return {
       success: true,
       data: {
         sessionId: session.id,
-        token: session.token,
+        token:     session.token,
         qrPayload,
-        state: session.state,
-        expiresAt: session.expiresAt.getTime(),
+        state:     session.state,
+        expiresAt: session.expiresAt?.getTime() ?? null,
       },
     };
   }
 
-  /** Get session status by token. */
+  /** Get session status by token (supports token array — any valid token works). */
   @Get('/session/:token')
   async getSession(@Param('token') token: string) {
-    const session = await this.sessionService.findByToken(token);
+    const session = await this.sessionService.findByAnyToken(token);
     if (!session) {
       this.ctx.status = 404;
       return { success: false, error: { code: SessionErrorCode.SESSION_NOT_FOUND } };
@@ -47,15 +70,128 @@ export class SessionController {
     return {
       success: true,
       data: {
-        sessionId: session.id,
-        state: session.state,
-        agentConnected: !!session.agentSocketId,
+        sessionId:       session.id,
+        connectionKey:   session.connectionKey,
+        state:           session.state,
+        agentConnected:  !!session.agentSocketId,
         mobileConnected: !!session.mobileSocketId,
-        agentHostname: session.agentHostname ?? null,
-        pairedAt: session.pairedAt?.getTime() ?? null,
-        expiresAt: session.expiresAt.getTime(),
+        agentHostname:   session.agentHostname ?? null,
+        desktopDeviceId: session.desktopDeviceId ?? null,
+        mobileDeviceId:  session.mobileDeviceId ?? null,
+        launchType:      session.launchType,
+        pairedAt:        session.pairedAt?.getTime() ?? null,
+        expiresAt:       session.expiresAt?.getTime() ?? null,
       },
     };
+  }
+
+  /**
+   * List sessions relevant to the given mobile device.
+   * Merges:
+   *   1. Sessions previously paired with this mobile (by mobileDeviceId)
+   *   2. Sessions with an active agent on any of the mobile's known desktops
+   *      (by desktopDeviceIds) — catches desktop restarts before re-pairing.
+   */
+  @Get('/sessions')
+  async listSessions(
+    @Query('mobileDeviceId')  mobileDeviceId:      string,
+    @Query('desktopDeviceIds') desktopDeviceIdsRaw?: string,
+  ) {
+    if (!mobileDeviceId) {
+      this.ctx.status = 400;
+      return { success: false, error: 'mobileDeviceId query param required' };
+    }
+
+    const desktopDeviceIds = (desktopDeviceIdsRaw ?? '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+
+    const [byMobile, byDesktop] = await Promise.all([
+      this.sessionService.findByMobileDeviceId(mobileDeviceId),
+      this.sessionService.findActiveByDesktopDeviceIds(desktopDeviceIds),
+    ]);
+
+    // Merge, deduplicate by session ID (byMobile takes precedence)
+    const sessionMap = new Map<string, (typeof byMobile)[number]>();
+    for (const s of [...byDesktop, ...byMobile]) sessionMap.set(s.id, s);
+    const sessions = [...sessionMap.values()]
+      .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
+
+    // Collect unique desktop device IDs
+    const desktopIds = [...new Set(
+      sessions.map(s => s.desktopDeviceId).filter(Boolean) as string[]
+    )];
+
+    // Batch-fetch desktop statuses
+    const statuses = await this.deviceService.listDesktopStatuses(desktopIds);
+    const statusMap = new Map(statuses.map(s => [s.deviceId, s]));
+
+    const data = sessions.map(s => ({
+      sessionId:       s.id,
+      connectionKey:   s.connectionKey,
+      token:           s.token,
+      state:           s.state,
+      agentConnected:  !!s.agentSocketId,
+      mobileConnected: !!s.mobileSocketId,
+      agentHostname:   s.agentHostname ?? null,
+      desktopDeviceId: s.desktopDeviceId ?? null,
+      mobileDeviceId:  s.mobileDeviceId ?? null,
+      launchType:      s.launchType,
+      pairedAt:        s.pairedAt?.getTime() ?? null,
+      lastActiveAt:    s.lastActivityAt.getTime(),
+      desktopStatus:   s.desktopDeviceId ? (statusMap.get(s.desktopDeviceId) ?? null) : null,
+    }));
+
+    return { success: true, data };
+  }
+
+  /**
+   * Get desktop status by device fingerprint.
+   * Mobile uses this to poll desktop health without an active session.
+   */
+  @Get('/device/:deviceId/status')
+  async getDesktopStatus(@Param('deviceId') deviceId: string) {
+    const status = await this.deviceService.getDesktopStatus(deviceId);
+    if (!status) {
+      this.ctx.status = 404;
+      return { success: false, error: 'Device status not found' };
+    }
+    return { success: true, data: status };
+  }
+
+  /**
+   * Desktop reports its health status via REST.
+   * Server caches and broadcasts to any connected mobile in same session.
+   */
+  @Post('/device/status')
+  async reportDesktopStatus(@Body() body: {
+    deviceId:       string;
+    hostname:       string;
+    platform:       string;
+    appVersion?:    string;
+    overallStatus:  string;
+    claudeStatus:   string;
+    terminalStatus: string;
+    claudePath?:    string;
+    uptimeMs?:      number;
+    reportedAt?:    number;
+  }) {
+    if (!body.deviceId) {
+      this.ctx.status = 400;
+      return { success: false, error: 'deviceId required' };
+    }
+    await this.deviceService.upsertDesktopStatus({
+      deviceId:       body.deviceId,
+      hostname:       body.hostname ?? '',
+      platform:       body.platform ?? '',
+      appVersion:     body.appVersion ?? '',
+      overallStatus:  body.overallStatus as 'healthy' | 'degraded' | 'offline',
+      claudeStatus:   body.claudeStatus  as 'running' | 'stopped' | 'error' | 'unknown',
+      terminalStatus: body.terminalStatus as 'running' | 'stopped' | 'error' | 'unknown',
+      claudePath:     body.claudePath ?? '',
+      uptimeMs:       body.uptimeMs ?? 0,
+      reportedAt:     body.reportedAt ?? Date.now(),
+    });
+    return { success: true };
   }
 
   /** Return a PNG QR code image for the pairing URL. */
@@ -68,10 +204,33 @@ export class SessionController {
     }
     const serverUrl = this.resolveServerUrl();
     const { buildPairUrl } = await import('@spark_coder/shared');
-    const payload = buildPairUrl(serverUrl, token);
+    const payload = buildPairUrl(serverUrl, token, session.desktopDeviceId ?? undefined);
     const png = await this.qrService.toPng(payload);
     this.ctx.set('Content-Type', 'image/png');
     this.ctx.body = png;
+  }
+
+  /**
+   * Delete a session by ID. Notifies all connected clients in the session room,
+   * then removes the record from the database.
+   */
+  @Del('/session/:sessionId')
+  async deleteSession(@Param('sessionId') sessionId: string) {
+    const session = await this.sessionService.findById(sessionId);
+    if (!session) {
+      this.ctx.status = 404;
+      return { success: false, error: 'Session not found' };
+    }
+
+    // Notify all connected clients before deleting
+    const payload: SessionDeletedPayload = {
+      sessionId:     session.id,
+      connectionKey: session.connectionKey,
+    };
+    this.socketApp.to(session.id).emit(Events.SESSION_DELETED, payload);
+
+    await this.sessionService.deleteSession(sessionId);
+    return { success: true };
   }
 
   private resolveServerUrl(): string {
