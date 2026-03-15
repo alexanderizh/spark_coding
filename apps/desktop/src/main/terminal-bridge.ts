@@ -241,9 +241,10 @@ export class TerminalBridge extends EventEmitter {
     // ── Connect WebSocket ────────────────────────────────────────────────
     this.socket = io(config.serverUrl, {
       auth: {
-        token:    session.token,
-        role:     'agent',
-        deviceId: config.deviceId,
+        sessionId: session.sessionId,
+        token:     session.token,
+        role:      'agent',
+        deviceId:  config.deviceId,
       },
       reconnection:          true,
       reconnectionAttempts:  Infinity,
@@ -384,11 +385,9 @@ export class TerminalBridge extends EventEmitter {
       }
 
       // Persist pairing record to local store
-      if (this.config && this.sessionId && this.token) {
+      if (this.config && this.sessionId) {
         const record: PairedSessionRecord = {
-          connectionKey:   `${this.config.deviceId}_${payload.mobileDeviceId}_claude`,
           sessionId:       this.sessionId,
-          tokens:          [this.token],
           serverUrl:       this.config.serverUrl,
           desktopDeviceId: this.config.deviceId,
           mobileDeviceId:  payload.mobileDeviceId,
@@ -419,10 +418,8 @@ export class TerminalBridge extends EventEmitter {
       if (payload.state === SessionState.PAIRED && !this.isPaired) {
         this.isPaired = true
         this.setStatus('paired', 'Reconnected')
-        if (this.config?.deviceId) {
-          updatePairedSessionLastUsed(
-            `${this.config.deviceId}_${payload.agentHostname ?? 'unknown'}_claude`
-          )
+        if (this.sessionId) {
+          updatePairedSessionLastUsed(this.sessionId)
         }
       }
     })

@@ -239,18 +239,17 @@ function getPairedSessions() {
 }
 function savePairedSession(record) {
   const all = getPairedSessions();
-  const idx = all.findIndex((s) => s.connectionKey === record.connectionKey);
+  const idx = all.findIndex((s) => s.sessionId === record.sessionId);
   if (idx >= 0) {
-    const merged = [.../* @__PURE__ */ new Set([...all[idx].tokens, ...record.tokens])];
-    all[idx] = { ...record, tokens: merged };
+    all[idx] = { ...all[idx], ...record };
   } else {
     all.push(record);
   }
   fs.writeFileSync(pairedSessionsPath(), JSON.stringify(all, null, 2), "utf8");
 }
-function updatePairedSessionLastUsed(connectionKey) {
+function updatePairedSessionLastUsed(sessionId) {
   const all = getPairedSessions();
-  const idx = all.findIndex((s) => s.connectionKey === connectionKey);
+  const idx = all.findIndex((s) => s.sessionId === sessionId);
   if (idx >= 0) {
     all[idx].lastUsedAt = Date.now();
     fs.writeFileSync(pairedSessionsPath(), JSON.stringify(all, null, 2), "utf8");
@@ -385,6 +384,7 @@ class TerminalBridge extends events.EventEmitter {
     };
     this.socket = socket_ioClient.io(config.serverUrl, {
       auth: {
+        sessionId: session.sessionId,
         token: session.token,
         role: "agent",
         deviceId: config.deviceId
@@ -515,11 +515,9 @@ class TerminalBridge extends events.EventEmitter {
         this.log("ERROR in SESSION_PAIR handler: %s", msg);
         this.setStatus("error", `Failed to initialize session: ${msg}`);
       }
-      if (this.config && this.sessionId && this.token) {
+      if (this.config && this.sessionId) {
         const record = {
-          connectionKey: `${this.config.deviceId}_${payload.mobileDeviceId}_claude`,
           sessionId: this.sessionId,
-          tokens: [this.token],
           serverUrl: this.config.serverUrl,
           desktopDeviceId: this.config.deviceId,
           mobileDeviceId: payload.mobileDeviceId,
@@ -553,10 +551,8 @@ class TerminalBridge extends events.EventEmitter {
       if (payload.state === shared.SessionState.PAIRED && !this.isPaired) {
         this.isPaired = true;
         this.setStatus("paired", "Reconnected");
-        if (this.config?.deviceId) {
-          updatePairedSessionLastUsed(
-            `${this.config.deviceId}_${payload.agentHostname ?? "unknown"}_claude`
-          );
+        if (this.sessionId) {
+          updatePairedSessionLastUsed(this.sessionId);
         }
       }
     });
@@ -1032,14 +1028,14 @@ async function fetchDesktopSessionsFromServer(serverUrl, desktopDeviceId) {
   const result = await response.json();
   if (!result.success || !Array.isArray(result.data)) return [];
   return result.data.map((item) => ({
-    connectionKey: item.connectionKey ?? `${item.sessionId}_${item.mobileDeviceId ?? "unknown"}_${item.launchType ?? "claude"}`,
     sessionId: item.sessionId,
-    tokens: item.token ? [item.token] : [],
     serverUrl,
     desktopDeviceId: item.desktopDeviceId ?? desktopDeviceId,
     mobileDeviceId: item.mobileDeviceId ?? "unknown",
-    desktopPlatform: item.agentPlatform ?? item.desktopStatus?.platform ?? void 0,
+    desktopPlatform: item.agentPlatform ?? item.deviceStatus?.platform ?? void 0,
     mobilePlatform: item.mobilePlatform ?? void 0,
+    desktopStatus: item.desktopStatus,
+    mobileStatus: item.mobileStatus,
     launchType: item.launchType ?? "claude",
     hostname: item.agentHostname ?? void 0,
     pairedAt: item.pairedAt ?? item.lastActiveAt ?? Date.now(),

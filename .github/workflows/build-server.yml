@@ -1,0 +1,39 @@
+name: build-server
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/server/**'
+      - 'packages/shared/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/build-server.yml'
+
+jobs:
+  build-server-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build server image
+        run: docker build -f apps/server/Dockerfile -t server:latest .
+
+      - name: Export image package
+        run: docker save server:latest -o server.tar
+
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server
+          path: server.tar
+          if-no-files-found: error

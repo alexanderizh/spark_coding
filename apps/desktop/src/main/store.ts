@@ -57,17 +57,15 @@ export function saveSettings(patch: Partial<AppSettings>): void {
  * the session list.
  */
 export interface PairedSessionRecord {
-  /** ${desktopDeviceId}_${mobileDeviceId}_${launchType} */
-  connectionKey:   string
   /** Server-side UUID for the session */
   sessionId:       string
-  /** Array of valid auth tokens; any one can be used to reconnect */
-  tokens:          string[]
   serverUrl:       string
   desktopDeviceId: string
   mobileDeviceId:  string
   desktopPlatform?: string
   mobilePlatform?: string
+  desktopStatus?:  'online' | 'offline'
+  mobileStatus?:   'online' | 'offline'
   launchType:      string
   /** Desktop hostname at time of pairing */
   hostname?:       string
@@ -91,29 +89,22 @@ export function getPairedSessions(): PairedSessionRecord[] {
 
 export function savePairedSession(record: PairedSessionRecord): void {
   const all = getPairedSessions()
-  const idx = all.findIndex(s => s.connectionKey === record.connectionKey)
+  const idx = all.findIndex(s => s.sessionId === record.sessionId)
   if (idx >= 0) {
-    // Merge tokens (deduplicate)
-    const merged = [...new Set([...all[idx].tokens, ...record.tokens])]
-    all[idx] = { ...record, tokens: merged }
+    all[idx] = { ...all[idx], ...record }
   } else {
     all.push(record)
   }
   writeFileSync(pairedSessionsPath(), JSON.stringify(all, null, 2), 'utf8')
 }
 
-export function updatePairedSessionLastUsed(connectionKey: string): void {
+export function updatePairedSessionLastUsed(sessionId: string): void {
   const all = getPairedSessions()
-  const idx = all.findIndex(s => s.connectionKey === connectionKey)
+  const idx = all.findIndex(s => s.sessionId === sessionId)
   if (idx >= 0) {
     all[idx].lastUsedAt = Date.now()
     writeFileSync(pairedSessionsPath(), JSON.stringify(all, null, 2), 'utf8')
   }
-}
-
-export function removePairedSession(connectionKey: string): void {
-  const all = getPairedSessions().filter(s => s.connectionKey !== connectionKey)
-  writeFileSync(pairedSessionsPath(), JSON.stringify(all, null, 2), 'utf8')
 }
 
 export function removePairedSessionById(sessionId: string): void {

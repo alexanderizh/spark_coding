@@ -39,14 +39,14 @@ export interface DesktopStatusReport {
 }
 
 export interface PairedSessionRecord {
-  connectionKey:   string
   sessionId:       string
-  tokens:          string[]
   serverUrl:       string
   desktopDeviceId: string
   mobileDeviceId:  string
   desktopPlatform?: string
   mobilePlatform?: string
+  desktopStatus?:  'online' | 'offline'
+  mobileStatus?:   'online' | 'offline'
   launchType:      string
   hostname?:       string
   pairedAt:        number

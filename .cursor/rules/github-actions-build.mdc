@@ -1,0 +1,21 @@
+---
+description: GitHub Actions 构建与产物归档规范
+globs: .github/workflows/*.yml
+alwaysApply: false
+---
+
+# GitHub Actions 构建规范
+
+## 产物命名
+
+- server 镜像构建物统一为 `server`，并通过 `docker save -o server.tar` 导出
+- desktop 构建物统一为 `spark_coder_desktop`
+
+## 矩阵任务归档
+
+- 矩阵任务不要直接上传同名构建物，先按平台拆分上传，再由聚合作业二次打包为统一物料名
+- 上传构建物时必须设置 `if-no-files-found: error`，避免空包误通过
+
+## 触发路径控制
+
+- workflow 使用 `paths` 限定相关目录，避免无关改动触发全量构建

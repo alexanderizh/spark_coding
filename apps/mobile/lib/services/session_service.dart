@@ -91,7 +91,8 @@ class SessionService {
     String? desktopDeviceId,
     String? desktopPlatform,
     String? mobilePlatform,
-    String? connectionKey,
+    LinkStatus? desktopOnlineStatus,
+    LinkStatus? mobileOnlineStatus,
     bool setActive = true,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -99,12 +100,10 @@ class SessionService {
     final normalizedHost = hostName?.trim();
     var targetIndex = -1;
 
-    // Prefer matching by connectionKey (stable across token refreshes)
-    if (connectionKey != null && connectionKey.isNotEmpty) {
-      targetIndex = _links.indexWhere(
-        (item) => item.connectionKey == connectionKey,
-      );
-    }
+    // Find existing link by sessionId
+    targetIndex = _links.indexWhere(
+      (item) => item.sessionId == sessionId && item.cliType == cliType,
+    );
 
     if (targetIndex < 0 &&
         normalizedHost != null &&
@@ -112,15 +111,6 @@ class SessionService {
       targetIndex = _links.indexWhere(
         (item) =>
             (item.hostName ?? '').trim() == normalizedHost &&
-            item.cliType == cliType,
-      );
-    }
-
-    if (targetIndex < 0) {
-      targetIndex = _links.indexWhere(
-        (item) =>
-            item.serverUrl == serverUrl &&
-            item.sessionId == sessionId &&
             item.cliType == cliType,
       );
     }
@@ -139,9 +129,6 @@ class SessionService {
       serverUrl: serverUrl,
       token: token,
       sessionId: sessionId,
-      connectionKey:
-          connectionKey ??
-          (targetIndex >= 0 ? _links[targetIndex].connectionKey : null),
       cliType: cliType,
       hostName: normalizedHost,
       desktopDeviceId:
@@ -154,6 +141,8 @@ class SessionService {
       mobilePlatform:
           mobilePlatform ??
           (targetIndex >= 0 ? _links[targetIndex].mobilePlatform : null),
+      desktopOnlineStatus: desktopOnlineStatus,
+      mobileOnlineStatus: mobileOnlineStatus,
       status: targetIndex >= 0
           ? _links[targetIndex].status
           : LinkStatus.unknown,

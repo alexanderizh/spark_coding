@@ -138,13 +138,14 @@ class ConnectionLink {
     required this.serverUrl,
     required this.token,
     required this.sessionId,
-    this.connectionKey,
     this.cliType = CliType.claude,
     this.hostName,
     this.desktopDeviceId,
     this.mobileDeviceId,
     this.desktopPlatform,
     this.mobilePlatform,
+    this.desktopOnlineStatus,
+    this.mobileOnlineStatus,
     this.desktopStatus,
     this.status = LinkStatus.unknown,
     this.lastCheckedAt,
@@ -156,9 +157,6 @@ class ConnectionLink {
   final String serverUrl;
   final String token;
   final String sessionId;
-
-  /// Stable connection key: ${desktopFp}_${mobileFp}_${launchType}
-  final String? connectionKey;
   final CliType cliType;
   final String? hostName;
 
@@ -169,6 +167,10 @@ class ConnectionLink {
   final String? mobileDeviceId;
   final String? desktopPlatform;
   final String? mobilePlatform;
+
+  /// Device online status from server
+  final LinkStatus? desktopOnlineStatus;
+  final LinkStatus? mobileOnlineStatus;
 
   /// Latest desktop health status from server cache
   final DesktopStatusSnapshot? desktopStatus;
@@ -182,13 +184,14 @@ class ConnectionLink {
     String? serverUrl,
     String? token,
     String? sessionId,
-    String? connectionKey,
     CliType? cliType,
     String? hostName,
     String? desktopDeviceId,
     String? mobileDeviceId,
     String? desktopPlatform,
     String? mobilePlatform,
+    LinkStatus? desktopOnlineStatus,
+    LinkStatus? mobileOnlineStatus,
     DesktopStatusSnapshot? desktopStatus,
     LinkStatus? status,
     int? lastCheckedAt,
@@ -200,13 +203,14 @@ class ConnectionLink {
       serverUrl: serverUrl ?? this.serverUrl,
       token: token ?? this.token,
       sessionId: sessionId ?? this.sessionId,
-      connectionKey: connectionKey ?? this.connectionKey,
       cliType: cliType ?? this.cliType,
       hostName: hostName ?? this.hostName,
       desktopDeviceId: desktopDeviceId ?? this.desktopDeviceId,
       mobileDeviceId: mobileDeviceId ?? this.mobileDeviceId,
       desktopPlatform: desktopPlatform ?? this.desktopPlatform,
       mobilePlatform: mobilePlatform ?? this.mobilePlatform,
+      desktopOnlineStatus: desktopOnlineStatus ?? this.desktopOnlineStatus,
+      mobileOnlineStatus: mobileOnlineStatus ?? this.mobileOnlineStatus,
       desktopStatus: desktopStatus ?? this.desktopStatus,
       status: status ?? this.status,
       lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
@@ -220,13 +224,14 @@ class ConnectionLink {
     'serverUrl': serverUrl,
     'token': token,
     'sessionId': sessionId,
-    'connectionKey': connectionKey,
     'cliType': cliType.value,
     'hostName': hostName,
     'desktopDeviceId': desktopDeviceId,
     'mobileDeviceId': mobileDeviceId,
     'desktopPlatform': desktopPlatform,
     'mobilePlatform': mobilePlatform,
+    'desktopOnlineStatus': desktopOnlineStatus?.value,
+    'mobileOnlineStatus': mobileOnlineStatus?.value,
     // desktopStatus is transient — not persisted
     'status': status.value,
     'lastCheckedAt': lastCheckedAt,
@@ -240,7 +245,6 @@ class ConnectionLink {
       serverUrl: json['serverUrl'] as String,
       token: json['token'] as String,
       sessionId: json['sessionId'] as String,
-      connectionKey: json['connectionKey'] as String?,
       cliType: CliTypeValue.fromString(
         json['cliType'] as String? ?? CliType.claude.value,
       ),
@@ -249,6 +253,12 @@ class ConnectionLink {
       mobileDeviceId: json['mobileDeviceId'] as String?,
       desktopPlatform: json['desktopPlatform'] as String?,
       mobilePlatform: json['mobilePlatform'] as String?,
+      desktopOnlineStatus: json['desktopOnlineStatus'] != null
+          ? LinkStatusValue.fromString(json['desktopOnlineStatus'] as String)
+          : null,
+      mobileOnlineStatus: json['mobileOnlineStatus'] != null
+          ? LinkStatusValue.fromString(json['mobileOnlineStatus'] as String)
+          : null,
       // desktopStatus is transient — rebuilt on refresh
       status: LinkStatusValue.fromString(
         json['status'] as String? ?? LinkStatus.unknown.value,

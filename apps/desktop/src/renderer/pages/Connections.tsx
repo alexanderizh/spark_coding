@@ -155,7 +155,7 @@ function ConnectionCard({ record, onDelete }: { record: PairedSessionRecord; onD
 
       {/* ID rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <IdChip label="会话 ID" value={record.connectionKey} />
+        <IdChip label="会话 ID" value={record.sessionId} />
         <IdChip label="主机 ID" value={record.desktopDeviceId} platform={record.desktopPlatform} />
         <IdChip label="手机 ID" value={record.mobileDeviceId} platform={record.mobilePlatform} />
       </div>
@@ -205,7 +205,7 @@ export function ConnectionsPage(): React.ReactElement {
   }, [])
 
   const handleDelete = useCallback(async (record: PairedSessionRecord) => {
-    if (!confirm(`确定要删除与「${record.hostname ?? record.connectionKey}」的配对记录吗？\n两端的配对信息都将被清除。`)) return
+    if (!confirm(`确定要删除与「${record.hostname ?? record.sessionId.slice(0, 8)}」的配对记录吗？\n两端的配对信息都将被清除。`)) return
     await window.api.deleteSession(record.sessionId, record.serverUrl)
     load()
   }, [load])
@@ -239,7 +239,7 @@ export function ConnectionsPage(): React.ReactElement {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {sessions.map((s) => (
-            <ConnectionCard key={s.connectionKey} record={s} onDelete={() => handleDelete(s)} />
+            <ConnectionCard key={s.sessionId} record={s} onDelete={() => handleDelete(s)} />
           ))}
         </div>
       )}

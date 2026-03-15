@@ -132,7 +132,12 @@ class SocketService {
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
-          .setAuth({'token': token, 'role': 'mobile'})
+          .setAuth({
+            'sessionId': sessionId,
+            'token': token,
+            'role': 'mobile',
+            'deviceId': deviceId,
+          })
           .enableReconnection()
           .setReconnectionDelay(1000)
           .setReconnectionDelayMax(30000)

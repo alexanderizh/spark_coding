@@ -72,27 +72,45 @@ export class RelayController {
   @OnWSConnection()
   async onConnect() {
     const socket = this.ctx;
-    const token    = socket.handshake.auth?.token  as string;
-    const role     = socket.handshake.auth?.role   as 'agent' | 'mobile';
-    const deviceId = socket.handshake.auth?.deviceId as string | undefined;
+    const sessionId = socket.handshake.auth?.sessionId as string | undefined;
+    const token     = socket.handshake.auth?.token     as string | undefined;
+    const deviceId  = socket.handshake.auth?.deviceId  as string | undefined;
+    const role      = socket.handshake.auth?.role      as 'agent' | 'mobile' | undefined;
 
-    this.log('info', '连接请求 socketId=%s role=%s', socket.id, role ?? '?');
+    this.log('info', '连接请求 socketId=%s role=%s deviceId=%s', socket.id, role ?? '?', deviceId ?? '?');
 
-    if (!token || !['agent', 'mobile'].includes(role)) {
-      this.log('warn', '连接拒绝 鉴权失败 socketId=%s', socket.id);
-      this.sendError(SessionErrorCode.INVALID_TOKEN, 'Missing or invalid auth');
+    if (!role || !['agent', 'mobile'].includes(role)) {
+      this.log('warn', '连接拒绝 角色无效 socketId=%s', socket.id);
+      this.sendError(SessionErrorCode.INVALID_TOKEN, 'Invalid role');
       socket.disconnect(true);
       return;
     }
 
-    // Try primary token first, then scan tokens array
-    const session = await this.sessionService.findByAnyToken(token);
+    let session = null as Awaited<ReturnType<typeof this.sessionService.findById>>;
+
+    if (sessionId) {
+      // 直接通过 sessionId 连接
+      session = await this.sessionService.findById(sessionId);
+    } else if (token) {
+      // 通过 token 连接（传统方式，用于配对流程）
+      session = await this.sessionService.findByToken(token);
+    } else if (deviceId) {
+      // 通过 deviceId 连接：查找设备相关会话并更新状态
+      const sessions = await this.sessionService.findByDeviceId(deviceId);
+      if (sessions.length > 0) {
+        const device = role === 'agent' ? 'desktop' : 'mobile';
+        await this.sessionService.updateAllSessionsDeviceStatus(deviceId, device, 'online', socket.id);
+        session = sessions[0];
+      }
+    }
+
     if (!session) {
       this.log('warn', '连接拒绝 会话不存在 socketId=%s role=%s', socket.id, role);
       this.sendError(SessionErrorCode.SESSION_NOT_FOUND, 'Session not found');
       socket.disconnect(true);
       return;
     }
+
     if (this.sessionService.isExpired(session)) {
       this.log('warn', '连接拒绝 会话已过期 socketId=%s role=%s', socket.id, role);
       this.sendError(SessionErrorCode.SESSION_EXPIRED, 'Session has expired');
@@ -100,9 +118,13 @@ export class RelayController {
       return;
     }
 
+    // 更新当前会话的设备状态
+    const device = role === 'agent' ? 'desktop' : 'mobile';
+    await this.sessionService.updateDeviceStatus(session.id, device, 'online', socket.id);
+
     socketMeta.set(socket.id, {
       sessionId:     session.id,
-      token,
+      token:         token ?? '',
       role,
       deviceId:      deviceId ?? null,
       agentHostname: null,
@@ -133,10 +155,14 @@ export class RelayController {
       const session = await this.sessionService.findById(meta.sessionId);
       if (!session || this.sessionService.isExpired(session)) return;
 
+      const device = meta.role === 'agent' ? 'desktop' : 'mobile';
+
+      // 更新设备离线状态
+      await this.sessionService.updateDeviceStatus(meta.sessionId, device, 'offline', null);
+
       if (meta.role === 'agent') {
         await this.sessionService.updateState(meta.sessionId, {
-          state:         SessionState.AGENT_DISCONNECTED,
-          agentSocketId: null,
+          state: SessionState.AGENT_DISCONNECTED,
         });
         // 主机断开时立即将 desktop_status 标记为 offline，避免 mobile 误判在线
         if (session.desktopDeviceId) {
@@ -146,11 +172,19 @@ export class RelayController {
         snapshotCache.delete(meta.sessionId);
       } else {
         await this.sessionService.updateState(meta.sessionId, {
-          state:          session.agentSocketId
+          state: session.agentSocketId
             ? SessionState.MOBILE_DISCONNECTED
             : SessionState.WAITING_FOR_AGENT,
-          mobileSocketId: null,
         });
+      }
+
+      // 同时更新该设备所有相关会话的状态
+      if (meta.deviceId) {
+        await this.sessionService.updateAllSessionsDeviceStatus(
+          meta.deviceId,
+          device,
+          'offline'
+        );
       }
 
       const updated = await this.sessionService.findById(meta.sessionId);
@@ -217,8 +251,6 @@ export class RelayController {
         await this.sessionService.completePairing(meta.sessionId, {
           desktopDeviceId: deviceId,
           mobileDeviceId:  session.mobileDeviceId,
-          launchType:      session.launchType,
-          pairedToken:     meta.token,
         }).catch((err: unknown) => {
           this.log('warn', 'completePairing 失败 sessionId=%s err=%s', meta.sessionId, (err as Error)?.message ?? err);
         });
@@ -344,14 +376,12 @@ export class RelayController {
     });
 
     if (hasAgent) {
-      // Complete pairing with connectionKey
+      // Complete pairing
       const desktopDeviceId = session.desktopDeviceId ?? this.findAgentDeviceId(meta.sessionId);
       if (desktopDeviceId && mobileDeviceId) {
         await this.sessionService.completePairing(meta.sessionId, {
           desktopDeviceId,
           mobileDeviceId,
-          launchType:  session.launchType,
-          pairedToken: meta.token,
         }).catch((err: unknown) => {
           this.log('warn', 'completePairing 失败 sessionId=%s err=%s', meta.sessionId, (err as Error)?.message ?? err);
         });
@@ -464,8 +494,7 @@ export class RelayController {
     if (!session) return;
 
     const payload: SessionDeletedPayload = {
-      sessionId:     session.id,
-      connectionKey: session.connectionKey,
+      sessionId: session.id,
     };
 
     // Notify all clients in the room before deleting

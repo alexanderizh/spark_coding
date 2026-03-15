@@ -17982,7 +17982,7 @@ function ConnectionCard({ record, onDelete }) {
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 12, color: "var(--text-muted)" }, children: formatTime(record.lastUsedAt) })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "会话 ID", value: record.connectionKey }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "会话 ID", value: record.sessionId }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "主机 ID", value: record.desktopDeviceId, platform: record.desktopPlatform }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(IdChip, { label: "手机 ID", value: record.mobileDeviceId, platform: record.mobilePlatform })
         ] }),
@@ -18030,7 +18030,7 @@ function ConnectionsPage() {
     window.api.listPairedSessions().then((list) => setSessions(list.sort((a, b2) => b2.lastUsedAt - a.lastUsedAt))).catch(() => setSessions([])).finally(() => setLoading(false));
   }, []);
   const handleDelete = reactExports.useCallback(async (record) => {
-    if (!confirm(`确定要删除与「${record.hostname ?? record.connectionKey}」的配对记录吗？
+    if (!confirm(`确定要删除与「${record.hostname ?? record.sessionId.slice(0, 8)}」的配对记录吗？
 两端的配对信息都将被清除。`)) return;
     await window.api.deleteSession(record.sessionId, record.serverUrl);
     load();
@@ -18058,7 +18058,7 @@ function ConnectionsPage() {
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { marginTop: 6 }, children: "前往「配对」页面完成首次配对" })
         ]
       }
-    ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: sessions.map((s15) => /* @__PURE__ */ jsxRuntimeExports.jsx(ConnectionCard, { record: s15, onDelete: () => handleDelete(s15) }, s15.connectionKey)) })
+    ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: sessions.map((s15) => /* @__PURE__ */ jsxRuntimeExports.jsx(ConnectionCard, { record: s15, onDelete: () => handleDelete(s15) }, s15.sessionId)) })
   ] });
 }
 const NAV = [

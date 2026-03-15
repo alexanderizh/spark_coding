@@ -184,14 +184,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             label: '主机名',
             value: session?.agentHostname ?? activeLink?.hostName ?? '—',
           ),
-          if (activeLink != null &&
-              (activeLink.connectionKey ?? '').isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _readOnlyField(
-              label: '连接密钥',
-              value: activeLink.connectionKey!,
-            ),
-          ],
           const SizedBox(height: 8),
           _readOnlyField(
             label: '状态',

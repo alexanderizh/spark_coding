@@ -75,10 +75,11 @@ export interface SessionResumePayload {
 
 export interface SessionResumedPayload {
   sessionId:       string;
-  connectionKey:   string;
   state:           SessionState;
   agentConnected:  boolean;
   mobileConnected: boolean;
+  desktopStatus?:  'online' | 'offline';
+  mobileStatus?:   'online' | 'offline';
   pairedAt:        number | null;
 }
 
@@ -148,8 +149,7 @@ export interface SessionErrorPayload {
 }
 
 export interface SessionDeletedPayload {
-  sessionId:     string;
-  connectionKey: string | null;
+  sessionId: string;
 }
 
 export interface SessionPingPayload {

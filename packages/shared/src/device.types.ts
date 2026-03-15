@@ -32,14 +32,14 @@ export interface DeviceInfo {
 
 /** Stored locally on each side (desktop userData + mobile secure storage) */
 export interface PairedSessionRecord {
-  connectionKey:   string;   // ${desktopFp}_${mobileFp}_${launchType}
-  sessionId:       string;   // server-side UUID
-  tokens:          string[]; // valid auth tokens (array)
-  serverUrl:       string;
+  sessionId:       string;
   desktopDeviceId: string;
   mobileDeviceId:  string;
-  launchType:      string;   // 'claude' | etc.
-  hostname?:       string;   // desktop hostname at pairing time
+  serverUrl:       string;
+  launchType:      string;
+  hostname?:       string;
   pairedAt:        number;
   lastUsedAt:      number;
+  desktopStatus?:  'online' | 'offline';
+  mobileStatus?:   'online' | 'offline';
 }

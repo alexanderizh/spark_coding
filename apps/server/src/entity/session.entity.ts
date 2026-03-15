@@ -16,21 +16,13 @@ export class Session {
   @Column({ type: 'varchar', unique: true, length: 64 })
   token!: string;
 
-  /**
-   * Stable connection identifier: `${desktopFp}_${mobileFp}_${launchType}`.
-   * Set after first successful pairing; used for no-QR reconnections.
-   */
-  @Column({ type: 'varchar', nullable: true, unique: true, length: 256, name: 'connection_key' })
-  connectionKey!: string | null;
+  /** Desktop device online status */
+  @Column({ type: 'varchar', length: 16, default: 'offline', name: 'desktop_status' })
+  desktopStatus!: 'online' | 'offline';
 
-  /**
-   * JSON-encoded string[] of all valid tokens for this session.
-   * Clients holding any of these tokens can reconnect without re-pairing.
-   * MySQL TEXT columns cannot have a default value; the application layer
-   * always sets this explicitly on insert.
-   */
-  @Column({ type: 'text', nullable: true, name: 'tokens' })
-  tokensJson!: string | null;
+  /** Mobile device online status */
+  @Column({ type: 'varchar', length: 16, default: 'offline', name: 'mobile_status' })
+  mobileStatus!: 'online' | 'offline';
 
   /** Desktop physical fingerprint */
   @Column({ type: 'varchar', nullable: true, length: 128, name: 'desktop_device_id' })
@@ -71,8 +63,7 @@ export class Session {
   lastActivityAt!: Date;
 
   /**
-   * Unpaired sessions expire after 24h. Paired sessions (with connectionKey)
-   * do NOT expire — they persist indefinitely for reconnect.
+   * Unpaired sessions expire after 24h.
    */
   @Column({ type: 'datetime', nullable: true, name: 'expires_at' })
   expiresAt!: Date | null;
@@ -82,15 +73,4 @@ export class Session {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
-
-  // ── Computed helpers ──────────────────────────────────────────────────────
-
-  get tokens(): string[] {
-    if (!this.tokensJson) return [];
-    try { return JSON.parse(this.tokensJson) as string[]; } catch { return []; }
-  }
-
-  set tokens(arr: string[]) {
-    this.tokensJson = JSON.stringify(arr);
-  }
 }

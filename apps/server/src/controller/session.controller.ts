@@ -58,7 +58,7 @@ export class SessionController {
   /** Get session status by token (supports token array — any valid token works). */
   @Get('/session/:token')
   async getSession(@Param('token') token: string) {
-    const session = await this.sessionService.findByAnyToken(token);
+    const session = await this.sessionService.findByToken(token);
     if (!session) {
       this.ctx.status = 404;
       return { success: false, error: { code: SessionErrorCode.SESSION_NOT_FOUND } };
@@ -71,7 +71,6 @@ export class SessionController {
       success: true,
       data: {
         sessionId:       session.id,
-        connectionKey:   session.connectionKey,
         state:           session.state,
         agentConnected:  !!session.agentSocketId,
         mobileConnected: !!session.mobileSocketId,
@@ -80,6 +79,8 @@ export class SessionController {
         mobilePlatform:  session.mobilePlatform ?? null,
         desktopDeviceId: session.desktopDeviceId ?? null,
         mobileDeviceId:  session.mobileDeviceId ?? null,
+        desktopStatus:   session.desktopStatus,
+        mobileStatus:    session.mobileStatus,
         launchType:      session.launchType,
         pairedAt:        session.pairedAt?.getTime() ?? null,
         expiresAt:       session.expiresAt?.getTime() ?? null,
@@ -214,8 +215,7 @@ export class SessionController {
 
     // Notify all connected clients before deleting
     const payload: SessionDeletedPayload = {
-      sessionId:     session.id,
-      connectionKey: session.connectionKey,
+      sessionId: session.id,
     };
     this.socketApp.to(session.id).emit(Events.SESSION_DELETED, payload);
 
@@ -238,7 +238,6 @@ export class SessionController {
 
     return sessions.map(s => ({
       sessionId:       s.id,
-      connectionKey:   s.connectionKey,
       token:           s.token,
       state:           s.state,
       agentConnected:  !!s.agentSocketId,
@@ -248,10 +247,12 @@ export class SessionController {
       mobilePlatform:  s.mobilePlatform ?? null,
       desktopDeviceId: s.desktopDeviceId ?? null,
       mobileDeviceId:  s.mobileDeviceId ?? null,
+      desktopStatus:   s.desktopStatus,
+      mobileStatus:    s.mobileStatus,
       launchType:      s.launchType,
       pairedAt:        s.pairedAt?.getTime() ?? null,
       lastActiveAt:    s.lastActivityAt.getTime(),
-      desktopStatus:   s.desktopDeviceId ? (statusMap.get(s.desktopDeviceId) ?? null) : null,
+      deviceStatus:    s.desktopDeviceId ? (statusMap.get(s.desktopDeviceId) ?? null) : null,
     }));
   }
 }

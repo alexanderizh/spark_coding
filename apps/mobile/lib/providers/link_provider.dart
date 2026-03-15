@@ -153,7 +153,6 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     final sessionId = serverData['sessionId'] as String;
     final token = serverData['token'] as String;
     final hostName = serverData['agentHostname'] as String?;
-    final connKey = serverData['connectionKey'] as String?;
     final desktopId = serverData['desktopDeviceId'] as String?;
     final mobileId = serverData['mobileDeviceId'] as String?;
     final agentConnected = serverData['agentConnected'] as bool? ?? false;
@@ -163,8 +162,14 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     final mobilePlatform = normalizeSystemPlatform(
       serverData['mobilePlatform'] as String?,
     );
+    final desktopOnlineStatus = serverData['desktopStatus'] != null
+        ? LinkStatusValue.fromString(serverData['desktopStatus'] as String)
+        : null;
+    final mobileOnlineStatus = serverData['mobileStatus'] != null
+        ? LinkStatusValue.fromString(serverData['mobileStatus'] as String)
+        : null;
     DesktopStatusSnapshot? desktopStatus;
-    final statusJson = serverData['desktopStatus'] as Map<String, dynamic>?;
+    final statusJson = serverData['deviceStatus'] as Map<String, dynamic>?;
     if (statusJson != null) {
       desktopStatus = DesktopStatusSnapshot.fromJson(statusJson);
     }
@@ -174,11 +179,10 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     final online = agentConnected || desktopHealthy;
 
     return ConnectionLink(
-      id: previous?.id ?? (connKey?.isNotEmpty == true ? connKey! : sessionId),
+      id: previous?.id ?? sessionId,
       serverUrl: serverUrl,
       token: token,
       sessionId: sessionId,
-      connectionKey: connKey ?? previous?.connectionKey,
       cliType: CliType.claude,
       hostName: (hostName?.trim().isEmpty ?? true)
           ? previous?.hostName
@@ -191,6 +195,8 @@ class LinkNotifier extends StateNotifier<LinkListState> {
       mobilePlatform: mobilePlatform.isEmpty
           ? (previous?.mobilePlatform ?? _socketService.mobilePlatform)
           : mobilePlatform,
+      desktopOnlineStatus: desktopOnlineStatus,
+      mobileOnlineStatus: mobileOnlineStatus,
       desktopStatus: desktopStatus,
       status: online ? LinkStatus.online : LinkStatus.offline,
       lastCheckedAt: now,
@@ -204,7 +210,6 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     required String token,
     required String sessionId,
     String? desktopDeviceId,
-    String? connectionKey,
   }) async {
     final saved = await _sessionService.saveOrUpdateLink(
       serverUrl: serverUrl,
@@ -214,7 +219,6 @@ class LinkNotifier extends StateNotifier<LinkListState> {
       setActive: true,
       desktopDeviceId: desktopDeviceId,
       mobilePlatform: _socketService.mobilePlatform,
-      connectionKey: connectionKey,
     );
     state = state.copyWith(links: _sessionService.links, errorMessage: null);
     return saved;

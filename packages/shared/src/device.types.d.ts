@@ -26,15 +26,15 @@ export interface DeviceInfo {
 }
 /** Stored locally on each side (desktop userData + mobile secure storage) */
 export interface PairedSessionRecord {
-    connectionKey: string;
     sessionId: string;
-    tokens: string[];
-    serverUrl: string;
     desktopDeviceId: string;
     mobileDeviceId: string;
+    serverUrl: string;
     launchType: string;
     hostname?: string;
     pairedAt: number;
     lastUsedAt: number;
+    desktopStatus?: 'online' | 'offline';
+    mobileStatus?: 'online' | 'offline';
 }
 //# sourceMappingURL=device.types.d.ts.map

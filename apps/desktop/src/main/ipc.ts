@@ -135,32 +135,31 @@ async function fetchDesktopSessionsFromServer(serverUrl: string, desktopDeviceId
     success?: boolean
     data?: Array<{
       sessionId: string
-      connectionKey?: string | null
-      token?: string | null
       agentHostname?: string | null
       agentPlatform?: string | null
       mobilePlatform?: string | null
       desktopDeviceId?: string | null
       mobileDeviceId?: string | null
+      desktopStatus?: 'online' | 'offline'
+      mobileStatus?: 'online' | 'offline'
       launchType?: string | null
       pairedAt?: number | null
       lastActiveAt?: number
-      desktopStatus?: { platform?: string | null } | null
+      deviceStatus?: { platform?: string | null } | null
     }>
   }
 
   if (!result.success || !Array.isArray(result.data)) return []
 
   return result.data.map((item) => ({
-    connectionKey: item.connectionKey
-      ?? `${item.sessionId}_${item.mobileDeviceId ?? 'unknown'}_${item.launchType ?? 'claude'}`,
     sessionId:       item.sessionId,
-    tokens:          item.token ? [item.token] : [],
     serverUrl,
     desktopDeviceId: item.desktopDeviceId ?? desktopDeviceId,
     mobileDeviceId:  item.mobileDeviceId ?? 'unknown',
-    desktopPlatform: item.agentPlatform ?? item.desktopStatus?.platform ?? undefined,
+    desktopPlatform: item.agentPlatform ?? item.deviceStatus?.platform ?? undefined,
     mobilePlatform:  item.mobilePlatform ?? undefined,
+    desktopStatus:   item.desktopStatus,
+    mobileStatus:    item.mobileStatus,
     launchType:      item.launchType ?? 'claude',
     hostname:        item.agentHostname ?? undefined,
     pairedAt:        item.pairedAt ?? item.lastActiveAt ?? Date.now(),
