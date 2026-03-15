@@ -14,7 +14,31 @@ on:
       - '.github/workflows/build-desktop.yml'
 
 jobs:
+  prepare-metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      build_no: ${{ steps.meta.outputs.build_no }}
+      artifact_name: ${{ steps.meta.outputs.artifact_name }}
+      archive_file: ${{ steps.meta.outputs.archive_file }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve artifact metadata
+        id: meta
+        run: |
+          VERSION="$(node -p "require('./apps/desktop/package.json').version")"
+          BUILD_NO="${{ github.run_number }}"
+          ARTIFACT_NAME="spark_coder_desktop_v${VERSION}-b${BUILD_NO}"
+          ARCHIVE_FILE="${ARTIFACT_NAME}.tar.gz"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build_no=${BUILD_NO}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=${ARTIFACT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "archive_file=${ARCHIVE_FILE}" >> "$GITHUB_OUTPUT"
+
   build-desktop:
+    needs: prepare-metadata
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -47,28 +71,30 @@ jobs:
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: spark_coder_desktop_${{ matrix.platform }}
+          name: ${{ needs.prepare-metadata.outputs.artifact_name }}_${{ matrix.platform }}
           path: apps/desktop/release/**
           if-no-files-found: error
 
   package-desktop:
     runs-on: ubuntu-latest
-    needs: build-desktop
+    needs:
+      - prepare-metadata
+      - build-desktop
     permissions:
       contents: read
     steps:
       - name: Download platform artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: spark_coder_desktop_*
+          pattern: ${{ needs.prepare-metadata.outputs.artifact_name }}_*
           path: desktop-artifacts
 
       - name: Create merged package
-        run: tar -czf spark_coder_desktop.tar.gz -C desktop-artifacts .
+        run: tar -czf "${{ needs.prepare-metadata.outputs.archive_file }}" -C desktop-artifacts .
 
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4
         with:
-          name: spark_coder_desktop
-          path: spark_coder_desktop.tar.gz
+          name: ${{ needs.prepare-metadata.outputs.artifact_name }}
+          path: ${{ needs.prepare-metadata.outputs.archive_file }}
           if-no-files-found: error

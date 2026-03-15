@@ -172,6 +172,38 @@ export class SessionService {
   }
 
   /**
+   * Create a new pre-paired session for a known device pair.
+   * Used when a new mobile device connects using a token already claimed by another mobile.
+   */
+  async createPairedSession(params: {
+    desktopDeviceId: string;
+    mobileDeviceId:  string;
+    launchType:      string;
+  }): Promise<Session> {
+    const token = randomBytes(32).toString('hex');
+    const now   = new Date();
+    const session = this.sessionRepo.create({
+      token,
+      desktopDeviceId: params.desktopDeviceId,
+      mobileDeviceId:  params.mobileDeviceId,
+      launchType:      params.launchType,
+      state:           SessionState.WAITING_FOR_AGENT,
+      desktopStatus:   'offline',
+      mobileStatus:    'offline',
+      agentSocketId:   null,
+      mobileSocketId:  null,
+      agentPlatform:   null,
+      mobilePlatform:  null,
+      agentHostname:   null,
+      pairedAt:        now,
+      lastActivityAt:  now,
+      expiresAt:       null,  // paired sessions don't expire
+    });
+    await this.sessionRepo.save(session);
+    return session;
+  }
+
+  /**
    * Complete pairing: persist mobile device ID, remove expiry (paired sessions don't expire).
    */
   async completePairing(sessionId: string, params: {

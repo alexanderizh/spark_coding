@@ -10,6 +10,7 @@ alwaysApply: false
 
 - server 镜像构建物统一为 `server`，并通过 `docker save -o server.tar` 导出
 - desktop 构建物统一为 `spark_coder_desktop`
+- desktop 构建产物命名需带版本构建号：`spark_coder_desktop_v<version>-b<run_number>`
 
 ## 矩阵任务归档
 
@@ -19,3 +20,9 @@ alwaysApply: false
 ## 触发路径控制
 
 - workflow 使用 `paths` 限定相关目录，避免无关改动触发全量构建
+- server 构建在 `master` 分支 push 后自动触发，并限定为 `apps/server/**` 或 `.github/workflows/**` 变更
+
+## 镜像发布
+
+- server 镜像需推送到 GitHub Packages（GHCR），至少包含 `latest` 与 `commit sha` 标签
+- 推送 GHCR 前需要开启 `packages: write` 权限并执行登录步骤

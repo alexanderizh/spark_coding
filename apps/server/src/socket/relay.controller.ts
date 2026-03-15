@@ -34,6 +34,7 @@ const SNAPSHOT_MAX_BYTES   = 48 * 1024;
 
 interface SocketMeta {
   sessionId:     string;
+  sessionIds:    Set<string>;  // all session rooms (agents may be in multiple)
   token:         string;
   role:          'agent' | 'mobile';
   deviceId:      string | null;   // physical device fingerprint
@@ -45,7 +46,7 @@ interface SocketMeta {
 // In-memory map: socketId → SocketMeta (rebuilt on reconnect)
 const socketMeta = new Map<string, SocketMeta>();
 
-// In-memory map: sessionId → latest snapshot (full-state)
+// In-memory map: sessionId → latest snapshot (full-state), keyed by desktopDeviceId
 const snapshotCache = new Map<string, string>();
 
 @WSController('/')
@@ -115,6 +116,58 @@ export class RelayController {
       return;
     }
 
+    // ── Multi-mobile support ─────────────────────────────────────────────────
+    // If a mobile connects to a session already claimed by a DIFFERENT device,
+    // find or create a dedicated session for this (desktop, mobile) pair so
+    // the original pairing is never overwritten.
+    if (
+      role === 'mobile' &&
+      deviceId &&
+      session.mobileDeviceId &&
+      session.mobileDeviceId !== deviceId &&
+      session.desktopDeviceId
+    ) {
+      let dedicatedSession = await this.sessionService.findByDevicePair(
+        session.desktopDeviceId, deviceId,
+      );
+      if (!dedicatedSession || this.sessionService.isExpired(dedicatedSession)) {
+        try {
+          dedicatedSession = await this.sessionService.createPairedSession({
+            desktopDeviceId: session.desktopDeviceId,
+            mobileDeviceId:  deviceId,
+            launchType:      session.launchType,
+          });
+          this.log('info', '为新移动设备创建配对会话 desktopDeviceId=%s mobileDeviceId=%s newSessionId=%s',
+            session.desktopDeviceId, deviceId, dedicatedSession.id);
+        } catch (err) {
+          this.log('warn', '创建专属会话失败 err=%s', (err as Error)?.message ?? err);
+          this.sendError(SessionErrorCode.SESSION_NOT_FOUND, 'Failed to create session for device');
+          socket.disconnect(true);
+          return;
+        }
+      }
+
+      // If the desktop agent is currently connected, make it join the new session room
+      const agentSocketId = this.findAgentSocketIdForDevice(session.desktopDeviceId);
+      if (agentSocketId) {
+        try {
+          (this.app as any).in(agentSocketId).socketsJoin(dedicatedSession.id);
+          const agentMeta = socketMeta.get(agentSocketId);
+          if (agentMeta) {
+            agentMeta.sessionIds.add(dedicatedSession.id);
+          }
+          await this.sessionService.updateDeviceStatus(
+            dedicatedSession.id, 'desktop', 'online', agentSocketId,
+          );
+        } catch (err) {
+          this.log('warn', '无法让 agent 加入新会话 room err=%s', (err as Error)?.message ?? err);
+        }
+      }
+
+      session = dedicatedSession;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     if (this.sessionService.isExpired(session)) {
       this.log('warn', '连接拒绝 会话已过期 socketId=%s role=%s', socket.id, role);
       this.sendError(SessionErrorCode.SESSION_EXPIRED, 'Session has expired');
@@ -128,6 +181,7 @@ export class RelayController {
 
     socketMeta.set(socket.id, {
       sessionId:     session.id,
+      sessionIds:    new Set([session.id]),
       token:         token ?? '',
       role,
       deviceId:      deviceId ?? null,
@@ -172,8 +226,8 @@ export class RelayController {
         if (session.desktopDeviceId) {
           await this.deviceService.markDesktopOffline(session.desktopDeviceId).catch(() => {/* ignore */});
         }
-        // Clear snapshot cache when agent disconnects
-        snapshotCache.delete(meta.sessionId);
+        // Clear snapshot cache when agent disconnects (keyed by deviceId)
+        snapshotCache.delete(meta.deviceId ?? meta.sessionId);
       } else {
         await this.sessionService.updateState(meta.sessionId, {
           state: session.agentSocketId
@@ -235,6 +289,22 @@ export class RelayController {
         platform: 'desktop',
         hostname: meta.agentHostname,
       }).catch(() => {/* ignore */});
+
+      // Join ALL sessions for this desktop so the agent can relay to any paired mobile
+      try {
+        const allSessions = await this.sessionService.findByDesktopDeviceId(deviceId);
+        for (const s of allSessions) {
+          if (!meta.sessionIds.has(s.id)) {
+            socket.join(s.id);
+            meta.sessionIds.add(s.id);
+            await this.sessionService.updateDeviceStatus(
+              s.id, 'desktop', 'online', socket.id,
+            ).catch(() => {/* ignore */});
+          }
+        }
+      } catch (err) {
+        this.log('warn', '加入所有桌面会话失败 err=%s', (err as Error)?.message ?? err);
+      }
     }
 
     const hasMobile  = !!session.mobileSocketId;
@@ -280,15 +350,17 @@ export class RelayController {
     if (!meta || !this.checkRateLimit(meta)) return;
     if (!this.checkPayloadSize(payload.data)) return;
 
-    // Cache snapshot if present and within size limits
+    // Cache snapshot if present and within size limits (keyed by desktopDeviceId for cross-session sharing)
     if (payload.snapshot && Buffer.byteLength(payload.snapshot, 'utf8') <= SNAPSHOT_MAX_BYTES) {
-      snapshotCache.set(meta.sessionId, payload.snapshot);
+      snapshotCache.set(meta.deviceId ?? meta.sessionId, payload.snapshot);
     }
 
     const dataLen = Buffer.byteLength(payload.data, 'utf8');
-    this.log('info', '收到 terminal:output sessionId=%s seq=%s bytes=%s ->mobile', meta.sessionId, payload.seq, dataLen);
-    // Use app.to() (io-level broadcast) — more reliable than ctx.to() inside async handlers
-    this.app.to(meta.sessionId).emit(Events.TERMINAL_OUTPUT, payload);
+    this.log('info', '收到 terminal:output sessionId=%s seq=%s bytes=%s ->mobile(s)', meta.sessionId, payload.seq, dataLen);
+    // Broadcast to all mobile sessions of this desktop agent
+    for (const sId of meta.sessionIds) {
+      this.app.to(sId).emit(Events.TERMINAL_OUTPUT, payload);
+    }
     await this.sessionService.touchActivity(meta.sessionId);
   }
 
@@ -301,25 +373,31 @@ export class RelayController {
       this.log('warn', '收到 terminal:snapshot 大小超限 sessionId=%s bytes=%s', meta.sessionId, Buffer.byteLength(snapshot || '', 'utf8'));
       return;
     }
-    snapshotCache.set(meta.sessionId, snapshot);
-    this.log('info', '收到 terminal:snapshot sessionId=%s bytes=%s ->mobile', meta.sessionId, Buffer.byteLength(snapshot, 'utf8'));
-    this.app.to(meta.sessionId).emit(Events.TERMINAL_SNAPSHOT, payload);
+    snapshotCache.set(meta.deviceId ?? meta.sessionId, snapshot);
+    this.log('info', '收到 terminal:snapshot sessionId=%s bytes=%s ->mobile(s)', meta.sessionId, Buffer.byteLength(snapshot, 'utf8'));
+    for (const sId of meta.sessionIds) {
+      this.app.to(sId).emit(Events.TERMINAL_SNAPSHOT, payload);
+    }
   }
 
   @OnWSMessage(Events.CLAUDE_PROMPT)
   async onClaudePrompt(payload: ClaudePromptPayload) {
     const meta = this.verifyRole('agent');
     if (!meta) return;
-    this.log('info', '收到 claude:prompt sessionId=%s type=%s ->mobile', meta.sessionId, payload.promptType);
-    this.ctx.to(meta.sessionId).emit(Events.CLAUDE_PROMPT, payload);
+    this.log('info', '收到 claude:prompt sessionId=%s type=%s ->mobile(s)', meta.sessionId, payload.promptType);
+    for (const sId of meta.sessionIds) {
+      this.app.to(sId).emit(Events.CLAUDE_PROMPT, payload);
+    }
   }
 
   @OnWSMessage(Events.RUNTIME_STATUS)
   async onRuntimeStatus(payload: RuntimeStatusPayload) {
     const meta = this.verifyRole('agent');
     if (!meta) return;
-    this.log('info', '收到 runtime:status sessionId=%s ready=%s ->mobile', meta.sessionId, payload.ready);
-    this.ctx.to(meta.sessionId).emit(Events.RUNTIME_STATUS, payload);
+    this.log('info', '收到 runtime:status sessionId=%s ready=%s ->mobile(s)', meta.sessionId, payload.ready);
+    for (const sId of meta.sessionIds) {
+      this.app.to(sId).emit(Events.RUNTIME_STATUS, payload);
+    }
   }
 
   /** Desktop daemon reports health → save to DB → forward to mobile */
@@ -332,13 +410,15 @@ export class RelayController {
     // Persist to DB
     await this.deviceService.upsertDesktopStatus(payload).catch(() => {/* ignore */});
 
-    // Forward updated status to all mobiles in this session
-    const fwdPayload: DesktopStatusUpdatePayload = {
-      ...payload,
-      sessionId:  meta.sessionId,
-      updatedAt:  Date.now(),
-    };
-    this.ctx.to(meta.sessionId).emit(Events.DESKTOP_STATUS_UPDATE, fwdPayload);
+    // Forward updated status to all mobiles across all sessions of this desktop
+    for (const sId of meta.sessionIds) {
+      const fwdPayload: DesktopStatusUpdatePayload = {
+        ...payload,
+        sessionId: sId,
+        updatedAt: Date.now(),
+      };
+      this.app.to(sId).emit(Events.DESKTOP_STATUS_UPDATE, fwdPayload);
+    }
   }
 
   // ── Mobile events ────────────────────────────────────────────────────────
@@ -413,8 +493,8 @@ export class RelayController {
         }
       }
 
-      // Send cached snapshot if available
-      const snap = snapshotCache.get(meta.sessionId);
+      // Send cached snapshot if available (keyed by desktopDeviceId for cross-session sharing)
+      const snap = snapshotCache.get(desktopDeviceId ?? meta.sessionId);
       if (snap) {
         socket.emit(Events.TERMINAL_SNAPSHOT, {
           sessionId: meta.sessionId,
@@ -569,6 +649,16 @@ export class RelayController {
     for (const meta of socketMeta.values()) {
       if (meta.role === 'agent' && meta.sessionId === sessionId) {
         return meta.deviceId;
+      }
+    }
+    return null;
+  }
+
+  /** Find the socket ID of the connected agent for a given desktop device ID. */
+  private findAgentSocketIdForDevice(deviceId: string): string | null {
+    for (const [socketId, meta] of socketMeta.entries()) {
+      if (meta.role === 'agent' && meta.deviceId === deviceId) {
+        return socketId;
       }
     }
     return null;
