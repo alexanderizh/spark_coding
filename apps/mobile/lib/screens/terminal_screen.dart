@@ -62,8 +62,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _listenForPrompts();
     _listenForRuntime();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final session = ref.read(sessionProvider);
-      if (session?.agentConnected == true) _ensureRuntime();
+      unawaited(_connectOnEnter());
     });
   }
 
@@ -188,6 +187,35 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _connectOnEnter() async {
+    final session = ref.read(sessionProvider);
+    if (session == null) {
+      AppLogger.warn('TerminalScreen', '进入终端时缺少 session，返回首页');
+      if (!mounted) return;
+      context.go(AppRoutes.home);
+      return;
+    }
+
+    final status = ref.read(connectionProvider);
+    if (status == ConnectionStatus.disconnected ||
+        status == ConnectionStatus.error) {
+      AppLogger.info('TerminalScreen', '进入终端页后发起连接，sessionId: ${session.sessionId}');
+      await ref
+          .read(connectionNotifierProvider.notifier)
+          .connect(
+            serverUrl: session.serverUrl,
+            token: session.token,
+            sessionId: session.sessionId,
+          );
+    }
+
+    if (!mounted) return;
+    final latestSession = ref.read(sessionProvider);
+    if (latestSession?.agentConnected == true) {
+      _ensureRuntime();
+    }
   }
 
   Future<void> _reconnect() async {

@@ -81,15 +81,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           serverUrl: link.serverUrl,
         );
     ref.read(terminalNotifierProvider.notifier).reset();
-    await ref
-        .read(connectionNotifierProvider.notifier)
-        .connect(
-          serverUrl: link.serverUrl,
-          token: link.token,
-          sessionId: link.sessionId,
-        );
     if (!mounted) return;
-    AppLogger.info('HomeScreen', '连接请求已发送，跳转到终端');
+    AppLogger.info('HomeScreen', '会话参数已准备，跳转到终端并在页面内发起连接');
     await context.push(AppRoutes.terminal);
     // Refresh link status after returning from terminal (connection may have changed)
     if (mounted) {
