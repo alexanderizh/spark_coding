@@ -487,10 +487,11 @@ class TerminalBridge extends events.EventEmitter {
       }
     });
     socket.on(shared.Events.SESSION_PAIR, (payload) => {
-      this.log("收到 session:pair mobileDeviceId=%s", payload.mobileDeviceId);
-      if (this.isPaired) {
-        this.setStatus("paired", `Reconnected with ${payload.mobileDeviceId}`);
-        const snap = this.xtermSnapshot || this.snapshotBuffer;
+      this.log("收到 session:pair mobileDeviceId=%s isPaired=%s ptyRunning=%s", payload.mobileDeviceId, this.isPaired, !!this.ptyProcess);
+      this.isPaired = true;
+      this.setStatus("paired", `Paired with ${payload.mobileDeviceId}`);
+      const snap = this.xtermSnapshot || this.snapshotBuffer;
+      if (this.ptyProcess) {
         if (snap && socket.connected && this.sessionId) {
           try {
             socket.emit(shared.Events.TERMINAL_SNAPSHOT, {
@@ -506,8 +507,6 @@ class TerminalBridge extends events.EventEmitter {
         }
         return;
       }
-      this.isPaired = true;
-      this.setStatus("paired", `Paired with ${payload.mobileDeviceId}`);
       try {
         this.spawnClaude();
       } catch (err) {
@@ -539,14 +538,8 @@ class TerminalBridge extends events.EventEmitter {
     socket.on(shared.Events.SESSION_STATE, (payload) => {
       this.log("收到 session:state state=%s", payload.state);
       if (payload.state === shared.SessionState.MOBILE_DISCONNECTED) {
-        this.log("Mobile 断开连接，终止 Claude 进程");
-        try {
-          this.ptyProcess?.kill();
-        } catch {
-        }
-        this.ptyProcess = void 0;
         this.isPaired = false;
-        this.setStatus("waiting", "Mobile disconnected — Claude stopped");
+        this.setStatus("waiting", "Mobile disconnected — waiting for reconnect");
       }
       if (payload.state === shared.SessionState.PAIRED && !this.isPaired) {
         this.isPaired = true;
