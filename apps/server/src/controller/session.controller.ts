@@ -90,35 +90,16 @@ export class SessionController {
 
   /**
    * List sessions relevant to the given mobile device.
-   * Merges:
-   *   1. Sessions previously paired with this mobile (by mobileDeviceId)
-   *   2. Sessions with an active agent on any of the mobile's known desktops
-   *      (by desktopDeviceIds) — catches desktop restarts before re-pairing.
+   * Returns only sessions associated with the given mobileDeviceId.
    */
   @Get('/sessions')
-  async listSessions(
-    @Query('mobileDeviceId')  mobileDeviceId:      string,
-    @Query('desktopDeviceIds') desktopDeviceIdsRaw?: string,
-  ) {
+  async listSessions(@Query('mobileDeviceId') mobileDeviceId: string) {
     if (!mobileDeviceId) {
       this.ctx.status = 400;
       return { success: false, error: 'mobileDeviceId query param required' };
     }
 
-    const desktopDeviceIds = (desktopDeviceIdsRaw ?? '')
-      .split(',').map(s => s.trim()).filter(Boolean);
-
-    const [byMobile, byDesktop] = await Promise.all([
-      this.sessionService.findByMobileDeviceId(mobileDeviceId),
-      this.sessionService.findActiveByDesktopDeviceIds(desktopDeviceIds),
-    ]);
-
-    // Merge, deduplicate by session ID (byMobile takes precedence)
-    const sessionMap = new Map<string, (typeof byMobile)[number]>();
-    for (const s of [...byDesktop, ...byMobile]) sessionMap.set(s.id, s);
-    const sessions = [...sessionMap.values()]
-      .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
-
+    const sessions = await this.sessionService.findByMobileDeviceId(mobileDeviceId);
     const data = await this.buildSessionListData(sessions);
     return { success: true, data };
   }

@@ -90,11 +90,6 @@ class LinkNotifier extends StateNotifier<LinkListState> {
       return;
     }
 
-    final knownDesktopIds = currentLinks
-        .map((l) => l.desktopDeviceId)
-        .whereType<String>()
-        .toSet()
-        .toList();
     final existingBySessionId = {
       for (final link in currentLinks) link.sessionId: link,
     };
@@ -102,14 +97,9 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     final refreshed = <ConnectionLink>[];
     for (final serverUrl in serverUrls) {
       try {
-        final queryParams = <String, dynamic>{'mobileDeviceId': mobileDeviceId};
-        if (knownDesktopIds.isNotEmpty) {
-          queryParams['desktopDeviceIds'] = knownDesktopIds.join(',');
-        }
-
         final response = await _dio.get<Map<String, dynamic>>(
           '$serverUrl/api/sessions',
-          queryParameters: queryParams,
+          queryParameters: <String, dynamic>{'mobileDeviceId': mobileDeviceId},
         );
         final data = response.data?['data'] as List<dynamic>?;
         if (data == null) continue;
