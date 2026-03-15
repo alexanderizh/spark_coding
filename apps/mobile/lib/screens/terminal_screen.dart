@@ -48,6 +48,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   _PendingPrompt? _pendingPrompt;
   bool _isTyping = false;
   bool _runtimeEnsuring = false;
+  bool _leaving = false;
 
   @override
   void initState() {
@@ -211,10 +212,26 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           );
     }
 
-    if (!mounted) return;
+    if (!mounted || _leaving) return;
     final latestSession = ref.read(sessionProvider);
     if (latestSession?.agentConnected == true) {
       _ensureRuntime();
+    }
+  }
+
+  Future<void> _leaveTerminal() async {
+    if (_leaving) return;
+    _leaving = true;
+    try {
+      await ref.read(connectionNotifierProvider.notifier).disconnect();
+      if (!mounted) return;
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.home);
+      }
+    } finally {
+      _leaving = false;
     }
   }
 
@@ -387,44 +404,55 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     final effectiveStatus = _getEffectiveStatus(connectionStatus, session);
 
     ref.listen<SessionModel?>(sessionProvider, (prev, next) {
-      if (next?.agentConnected == true && prev?.agentConnected != true) {
+      final becameConnected =
+          next?.agentConnected == true && prev?.agentConnected != true;
+      if (!becameConnected || _leaving) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _leaving) return;
         _ensureRuntime();
-      }
+      });
     });
     final showBanner =
         connectionStatus == ConnectionStatus.disconnected ||
         connectionStatus == ConnectionStatus.error;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
-      appBar: _buildAppBar(
-        context,
-        effectiveStatus,
-        session: session,
-        isTyping: _isTyping,
-        runtimeEnsuring: _runtimeEnsuring,
-      ),
-      body: Column(
-        children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: showBanner
-                ? _ReconnectBanner(
-                    key: const ValueKey('reconnect_banner'),
-                    onReconnect: _reconnect,
-                    onDisconnect: _disconnect,
-                    isError: connectionStatus == ConnectionStatus.error,
-                    errorMessage: connectionState.errorMessage,
-                  )
-                : const SizedBox.shrink(key: ValueKey('no_banner')),
-          ),
-          Expanded(child: _buildTerminalContent()),
-          InputToolbar(
-            onSendMessage: _sendMessage,
-            onTypingChanged: _handleTypingChanged,
-            onRawInput: _sendRawInput,
-          ),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_leaveTerminal());
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF1A1A2E),
+        appBar: _buildAppBar(
+          context,
+          effectiveStatus,
+          session: session,
+          isTyping: _isTyping,
+          runtimeEnsuring: _runtimeEnsuring,
+        ),
+        body: Column(
+          children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: showBanner
+                  ? _ReconnectBanner(
+                      key: const ValueKey('reconnect_banner'),
+                      onReconnect: _reconnect,
+                      onDisconnect: _disconnect,
+                      isError: connectionStatus == ConnectionStatus.error,
+                      errorMessage: connectionState.errorMessage,
+                    )
+                  : const SizedBox.shrink(key: ValueKey('no_banner')),
+            ),
+            Expanded(child: _buildTerminalContent()),
+            InputToolbar(
+              onSendMessage: _sendMessage,
+              onTypingChanged: _handleTypingChanged,
+              onRawInput: _sendRawInput,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -488,17 +516,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       titleSpacing: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios, size: 18),
-        onPressed: () async {
-          // 退出终端前主动断开 socket，让服务端及时更新会话状态，
-          // 同时避免旧连接断开与新连接建立之间的竞态条件
-          await ref.read(connectionNotifierProvider.notifier).disconnect();
-          if (!context.mounted) return;
-          if (context.canPop()) {
-            context.pop();
-          } else {
-            context.go(AppRoutes.home);
-          }
-        },
+        onPressed: () => unawaited(_leaveTerminal()),
         tooltip: '返回',
       ),
       title: Column(
