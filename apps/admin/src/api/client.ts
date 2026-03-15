@@ -12,11 +12,19 @@ export interface SessionItem {
   agentSocketId: string | null;
   mobileSocketId: string | null;
   agentPlatform: string | null;
+  agentHostname: string | null;
   mobileDeviceId: string | null;
   pairedAt: number | null;
   lastActivityAt: number;
   expiresAt: number;
   createdAt: number;
+}
+
+/** 连接标识：主机+手机+claude，用于展示与去重 */
+export function connectionLink(item: SessionItem): string {
+  const agent = item.agentHostname || item.agentPlatform || '—';
+  const mobile = item.mobileDeviceId || '—';
+  return `${agent}|${mobile}|claude`;
 }
 
 export interface SessionsResponse {

@@ -67,8 +67,10 @@ class _InputToolbarState extends State<InputToolbar> {
   }
 
   Future<void> _showCommandSheet() async {
+    FocusScope.of(context).unfocus();
     final selected = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -76,46 +78,53 @@ class _InputToolbarState extends State<InputToolbar> {
       builder: (context) {
         return SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDEDEDE),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                ..._commands.map(
-                  (item) => ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    title: Text(
-                      item.title,
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDEDEDE),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    subtitle: Text(
-                      '${item.command} · ${item.desc}',
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 12,
+                    ..._commands.map(
+                      (item) => ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        title: Text(
+                          item.title,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${item.command} · ${item.desc}',
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: Colors.black38,
+                        ),
+                        onTap: () => Navigator.of(context).pop(item.command),
                       ),
                     ),
-                    trailing: const Icon(
-                      Icons.chevron_right,
-                      color: Colors.black38,
-                    ),
-                    onTap: () => Navigator.of(context).pop(item.command),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );

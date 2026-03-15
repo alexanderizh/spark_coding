@@ -53,6 +53,7 @@ class SessionNotifier extends StateNotifier<SessionModel?> {
       );
     } else {
       state = state!.copyWith(
+        sessionId: event.sessionId,
         state: event.state,
         agentConnected: event.agentConnected,
         mobileConnected: event.mobileConnected,

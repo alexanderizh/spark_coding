@@ -1,0 +1,25 @@
+---
+description: 管理后台 Vite + React + Ant Design 规范
+globs: apps/admin/**/*
+alwaysApply: false
+---
+
+# 管理后台 (apps/admin)
+
+## 技术栈
+
+- Vite 5 + React 18 + React Router 6 + Ant Design 5 + Less
+- 管理员账号密码通过 server 环境变量 `ADMIN_USERNAME`、`ADMIN_PASSWORD` 初始化
+- 前端使用 Basic Auth 调用 `/api/admin/*` 接口
+
+## 开发
+
+- `yarn dev:admin` 或 `cd apps/admin && yarn dev` 启动开发服务（端口 5174）
+- API 代理到 `http://localhost:7001`，需先启动 server
+
+## 配置
+
+- `vite.config.ts`：端口、代理、路径别名 `@` -> `src`
+- 路由：`src/App.tsx` 使用 React Router 的 Routes/Route
+- 布局：`src/layouts/Layout.tsx`，带 Header、Menu、Outlet
+- 权限：`AuthWrapper` 包裹需登录路由，未登录重定向到 `/login`

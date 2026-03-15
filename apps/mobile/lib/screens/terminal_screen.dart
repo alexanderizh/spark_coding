@@ -16,6 +16,30 @@ import '../utils/claude_chat_parser.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/input_toolbar.dart';
 
+// ---------------------------------------------------------------------------
+// Turn model
+// ---------------------------------------------------------------------------
+
+enum _TurnRole { user, claude }
+
+class _Turn {
+  _Turn({
+    required this.role,
+    required this.text,
+    this.promptType,
+    this.promptResolved = false,
+  });
+
+  final _TurnRole role;
+  String text;
+  final ClaudePromptType? promptType;
+  bool promptResolved;
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
 class TerminalScreen extends ConsumerStatefulWidget {
   const TerminalScreen({super.key});
 
@@ -29,15 +53,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   StreamSubscription<ClaudePrompt>? _promptSub;
   StreamSubscription<RuntimeStatusEvent>? _runtimeSub;
   final ScrollController _scrollController = ScrollController();
-  final StringBuffer _assistantBuffer = StringBuffer();
   final ClaudeChatParser _chatParser = ClaudeChatParser();
   final Map<int, TerminalOutput> _pendingOutputs = {};
-  Timer? _assistantFlushTimer;
-  int _messageSeed = 0;
   int _lastOutputSeq = -1;
-  final List<_ChatMessage> _messages = [];
+  final List<_Turn> _turns = [];
+  bool _isClaudeStreaming = false;
   bool _isTyping = false;
-  bool _runtimeEnsuring = true;
+  bool _runtimeEnsuring = false;
 
   @override
   void initState() {
@@ -46,7 +68,10 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _listenForOutput();
     _listenForPrompts();
     _listenForRuntime();
-    _ensureRuntime();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final session = ref.read(sessionProvider);
+      if (session?.agentConnected == true) _ensureRuntime();
+    });
   }
 
   @override
@@ -55,7 +80,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _outputSub?.cancel();
     _promptSub?.cancel();
     _runtimeSub?.cancel();
-    _assistantFlushTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -65,6 +89,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _errorSub = socketService.sessionErrors.listen((error) {
       AppLogger.error('TerminalScreen', '收到服务端 session 错误', error.message);
       if (!mounted) return;
+      if (_runtimeEnsuring) setState(() { _runtimeEnsuring = false; });
       _showSessionError(error.message);
     });
   }
@@ -95,13 +120,19 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   void _ingestOutputChunk(TerminalOutput output) {
     final clean = _chatParser.parseAssistantChunk(output.data);
     if (clean == null || clean.isEmpty) return;
-    if (_assistantBuffer.isNotEmpty) _assistantBuffer.writeln();
-    _assistantBuffer.write(clean);
-    _assistantFlushTimer?.cancel();
-    _assistantFlushTimer = Timer(
-      const Duration(milliseconds: 220),
-      _flushAssistantBuffer,
-    );
+    if (!mounted) return;
+    setState(() {
+      if (_isClaudeStreaming &&
+          _turns.isNotEmpty &&
+          _turns.last.role == _TurnRole.claude &&
+          _turns.last.promptType == null) {
+        _turns.last.text = clean; // replace in-place
+      } else {
+        _turns.add(_Turn(role: _TurnRole.claude, text: clean));
+        _isClaudeStreaming = true;
+      }
+    });
+    _scrollToBottom();
   }
 
   void _listenForPrompts() {
@@ -112,17 +143,16 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         rawText: prompt.rawText,
         fallbackTitle: _promptTitle(prompt.promptType),
       );
-      _appendMessage(
-        _ChatMessage(
-          id: _nextMessageId(),
-          role: _ChatRole.assistant,
+      if (!mounted) return;
+      setState(() {
+        _isClaudeStreaming = false;
+        _turns.add(_Turn(
+          role: _TurnRole.claude,
           text: displayText,
-          time: DateTime.now(),
-          promptType: prompt.promptType.requiresYesNo
-              ? prompt.promptType
-              : null,
-        ),
-      );
+          promptType: prompt.promptType.requiresYesNo ? prompt.promptType : null,
+        ));
+      });
+      _scrollToBottom();
     });
   }
 
@@ -149,43 +179,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     socketService.sendRuntimeEnsure('claude');
   }
 
-  String _nextMessageId() {
-    _messageSeed += 1;
-    return '${DateTime.now().microsecondsSinceEpoch}_$_messageSeed';
-  }
-
-  void _flushAssistantBuffer() {
-    final text = _assistantBuffer.toString().trim();
-    _assistantBuffer.clear();
-    if (text.isEmpty) return;
-    final now = DateTime.now();
-    if (_messages.isNotEmpty &&
-        _messages.last.role == _ChatRole.assistant &&
-        _messages.last.promptType == null &&
-        now.difference(_messages.last.time).inSeconds <= 1) {
-      setState(() {
-        final last = _messages.removeLast();
-        _messages.add(last.copyWith(text: '${last.text}\n$text', time: now));
-      });
-      _scrollToBottom();
-      return;
-    }
-    _appendMessage(
-      _ChatMessage(
-        id: _nextMessageId(),
-        role: _ChatRole.assistant,
-        text: text,
-        time: now,
-      ),
-    );
-  }
-
-  void _appendMessage(_ChatMessage message) {
-    if (!mounted) return;
-    setState(() => _messages.add(message));
-    _scrollToBottom();
-  }
-
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
@@ -201,14 +194,12 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     final socketService = ref.read(socketServiceProvider);
     _chatParser.registerUserInput(text);
     socketService.sendInput('$text\r');
-    _appendMessage(
-      _ChatMessage(
-        id: _nextMessageId(),
-        role: _ChatRole.user,
-        text: text,
-        time: DateTime.now(),
-      ),
-    );
+    if (!mounted) return;
+    setState(() {
+      _isClaudeStreaming = false;
+      _turns.add(_Turn(role: _TurnRole.user, text: text));
+    });
+    _scrollToBottom();
   }
 
   void _handleTypingChanged(bool isTyping) {
@@ -222,27 +213,17 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     return name;
   }
 
-  void _sendPromptDecision({
-    required _ChatMessage message,
-    required bool approved,
-  }) {
+  void _sendPromptDecision({required _Turn turn, required bool approved}) {
     final socketService = ref.read(socketServiceProvider);
     _chatParser.registerUserInput(approved ? 'y' : 'n');
     socketService.sendInput(approved ? 'y\r' : 'n\r');
+    if (!mounted) return;
     setState(() {
-      final index = _messages.indexWhere((item) => item.id == message.id);
-      if (index >= 0) {
-        _messages[index] = _messages[index].copyWith(promptResolved: true);
-      }
+      turn.promptResolved = true;
+      _isClaudeStreaming = false;
+      _turns.add(_Turn(role: _TurnRole.user, text: approved ? '同意' : '拒绝'));
     });
-    _appendMessage(
-      _ChatMessage(
-        id: _nextMessageId(),
-        role: _ChatRole.user,
-        text: approved ? '同意' : '拒绝',
-        time: DateTime.now(),
-      ),
-    );
+    _scrollToBottom();
   }
 
   void _showSessionError(String message) {
@@ -286,11 +267,127 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     context.go(AppRoutes.home);
   }
 
+  ConnectionStatus _getEffectiveStatus(
+    ConnectionStatus socketStatus,
+    SessionModel? session,
+  ) {
+    if (socketStatus != ConnectionStatus.connected) {
+      return socketStatus;
+    }
+    if (session == null) {
+      return ConnectionStatus.connecting;
+    }
+
+    if (session.agentConnected) {
+      return ConnectionStatus.connected;
+    }
+
+    switch (session.state) {
+      case SessionState.agentDisconnected:
+      case SessionState.expired:
+        return ConnectionStatus.disconnected;
+      case SessionState.error:
+        return ConnectionStatus.error;
+      case SessionState.waitingForAgent:
+      case SessionState.waitingForMobile:
+      case SessionState.unknown:
+      default:
+        return ConnectionStatus.connecting;
+    }
+  }
+
+  Widget _buildTurn(_Turn turn) {
+    if (turn.role == _TurnRole.user) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '❯  ',
+              style: TextStyle(
+                color: Color(0xFF9E9E9E),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Expanded(
+              child: Text(
+                turn.text,
+                style: const TextStyle(
+                  color: Color(0xFF616161),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Claude turn
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            turn.text,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              height: 1.6,
+            ),
+          ),
+          if (turn.promptType != null && !turn.promptResolved) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        _sendPromptDecision(turn: turn, approved: false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      side: const BorderSide(color: Color(0xFFBDBDBD)),
+                    ),
+                    child: const Text('拒绝'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () =>
+                        _sendPromptDecision(turn: turn, approved: true),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('同意'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final connectionState = ref.watch(connectionNotifierProvider);
     final session = ref.watch(sessionProvider);
     final connectionStatus = connectionState.status;
+    final effectiveStatus = _getEffectiveStatus(connectionStatus, session);
+
+    ref.listen<SessionModel?>(sessionProvider, (prev, next) {
+      if (next?.agentConnected == true && prev?.agentConnected != true) {
+        _ensureRuntime();
+      }
+    });
     final showBanner =
         connectionStatus == ConnectionStatus.disconnected ||
         connectionStatus == ConnectionStatus.error;
@@ -299,9 +396,10 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       backgroundColor: const Color(0xFFECEFF3),
       appBar: _buildAppBar(
         context,
-        connectionStatus,
-        hostName: _resolveHostName(session?.agentHostname),
+        effectiveStatus,
+        session: session,
         isTyping: _isTyping,
+        runtimeEnsuring: _runtimeEnsuring,
       ),
       body: Column(
         children: [
@@ -317,39 +415,33 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                   )
                 : const SizedBox.shrink(key: ValueKey('no_banner')),
           ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: _runtimeEnsuring
-                ? Container(
-                    key: const ValueKey('runtime_loading'),
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    color: const Color(0xFFFFF3E0),
-                    child: const Text(
-                      '正在检查 Claude 运行状态...',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  )
-                : const SizedBox.shrink(key: ValueKey('runtime_ready')),
-          ),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              itemCount: _messages.length + (_messages.isEmpty ? 1 : 0),
+              padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
+              itemCount: _turns.isEmpty ? 1 : _turns.length,
               itemBuilder: (context, index) {
-                if (_messages.isEmpty) {
-                  return const _EmptyChat();
+                if (_turns.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 80),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.terminal, color: Colors.black26, size: 28),
+                          SizedBox(height: 8),
+                          Text(
+                            '开始对话',
+                            style: TextStyle(
+                              color: Colors.black38,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 }
-                final message = _messages[index];
-                return _ChatBubble(
-                  message: message,
-                  onDecision: (approved) =>
-                      _sendPromptDecision(message: message, approved: approved),
-                );
+                return _buildTurn(_turns[index]);
               },
             ),
           ),
@@ -365,12 +457,60 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     ConnectionStatus status, {
-    required String hostName,
+    required SessionModel? session,
     required bool isTyping,
+    required bool runtimeEnsuring,
   }) {
+    final hostName = _resolveHostName(session?.agentHostname);
+    final agentConnected = session?.agentConnected ?? false;
+
+    Widget? statusLine;
+    if (runtimeEnsuring) {
+      statusLine = const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE6831A)),
+            ),
+          ),
+          SizedBox(width: 5),
+          Text(
+            '正在检查 Claude...',
+            style: TextStyle(
+              fontSize: 11,
+              color: Color(0xFFE6831A),
+              fontWeight: FontWeight.normal,
+            ),
+          ),
+        ],
+      );
+    } else if (agentConnected) {
+      statusLine = const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 7, color: Color(0xFF2E7D32)),
+          SizedBox(width: 4),
+          Text(
+            'Claude 运行中',
+            style: TextStyle(
+              fontSize: 11,
+              color: Color(0xFF2E7D32),
+              fontWeight: FontWeight.normal,
+            ),
+          ),
+        ],
+      );
+    }
+
     return AppBar(
       backgroundColor: Colors.white,
       foregroundColor: Colors.black,
+      centerTitle: false,
+      titleSpacing: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios, size: 18),
         onPressed: () {
@@ -382,23 +522,39 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         },
         tooltip: '返回',
       ),
-      title: Row(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Flexible(
-            child: Text(hostName, maxLines: 1, overflow: TextOverflow.ellipsis),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  hostName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                child: isTyping
+                    ? const Padding(
+                        key: ValueKey('typing_indicator'),
+                        padding: EdgeInsets.only(left: 8),
+                        child: _TypingIndicator(),
+                      )
+                    : const SizedBox.shrink(key: ValueKey('typing_none')),
+              ),
+            ],
           ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeOutCubic,
-            child: isTyping
-                ? const Padding(
-                    key: ValueKey('typing_indicator'),
-                    padding: EdgeInsets.only(left: 8),
-                    child: _TypingIndicator(),
-                  )
-                : const SizedBox.shrink(key: ValueKey('typing_none')),
-          ),
+          if (statusLine != null) ...[
+            const SizedBox(height: 1),
+            statusLine,
+          ],
         ],
       ),
       actions: [
@@ -416,6 +572,10 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Typing indicator widget
+// ---------------------------------------------------------------------------
 
 class _TypingIndicator extends StatefulWidget {
   const _TypingIndicator();
@@ -486,146 +646,9 @@ class _TypingIndicatorState extends State<_TypingIndicator>
   }
 }
 
-enum _ChatRole { user, assistant }
-
-class _ChatMessage {
-  const _ChatMessage({
-    required this.id,
-    required this.role,
-    required this.text,
-    required this.time,
-    this.promptType,
-    this.promptResolved = false,
-  });
-
-  final String id;
-  final _ChatRole role;
-  final String text;
-  final DateTime time;
-  final ClaudePromptType? promptType;
-  final bool promptResolved;
-
-  _ChatMessage copyWith({String? text, DateTime? time, bool? promptResolved}) {
-    return _ChatMessage(
-      id: id,
-      role: role,
-      text: text ?? this.text,
-      time: time ?? this.time,
-      promptType: promptType,
-      promptResolved: promptResolved ?? this.promptResolved,
-    );
-  }
-}
-
-class _EmptyChat extends StatelessWidget {
-  const _EmptyChat();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(top: 80),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.forum_outlined, color: Colors.black38, size: 32),
-            SizedBox(height: 8),
-            Text('开始对话', style: TextStyle(color: Colors.black45, fontSize: 14)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChatBubble extends StatelessWidget {
-  const _ChatBubble({required this.message, required this.onDecision});
-
-  final _ChatMessage message;
-  final ValueChanged<bool> onDecision;
-
-  @override
-  Widget build(BuildContext context) {
-    final isUser = message.role == _ChatRole.user;
-    final radius = BorderRadius.only(
-      topLeft: const Radius.circular(14),
-      topRight: const Radius.circular(14),
-      bottomLeft: Radius.circular(isUser ? 14 : 4),
-      bottomRight: Radius.circular(isUser ? 4 : 14),
-    );
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isUser ? Colors.black : Colors.white,
-              borderRadius: radius,
-              border: isUser
-                  ? null
-                  : Border.all(color: const Color(0xFFE2E2E2)),
-            ),
-            padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.text,
-                  style: TextStyle(
-                    color: isUser ? Colors.white : Colors.black87,
-                    fontSize: 14,
-                    height: 1.45,
-                  ),
-                ),
-                if (message.promptType != null && !message.promptResolved) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => onDecision(false),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            side: const BorderSide(color: Color(0xFFBDBDBD)),
-                          ),
-                          child: const Text('拒绝'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => onDecision(true),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            backgroundColor: Colors.black,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('同意'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 2),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    _formatTime(message.time),
-                    style: TextStyle(
-                      color: isUser ? Colors.white70 : Colors.black45,
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// ---------------------------------------------------------------------------
+// Helper functions
+// ---------------------------------------------------------------------------
 
 String _formatTime(DateTime time) {
   final hh = time.hour.toString().padLeft(2, '0');

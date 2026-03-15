@@ -34,6 +34,7 @@ class ClaudeChatParser {
     final filtered = <String>[];
     for (var line in lines) {
       line = _unwrapBoxLine(line);
+      line = _stripResponseIndicatorPrefix(line);
       final trimmed = line.trim();
       if (trimmed.isEmpty) {
         filtered.add('');
@@ -104,9 +105,26 @@ class ClaudeChatParser {
 
   bool _isCliMetaLine(String line) {
     return RegExp(
-      r'^(?:>\s*$|>\s*\/\w*|Esc to interrupt|Press (?:Ctrl|⌃)\+C|Running\s+tool.*|Tool:\s.*|⎿\s.*|╰─.*|╭─.*)$',
+      r'^(?:'
+      r'❯\s*$|❯\s*\/\w*'           // Claude CLI ❯ prompt
+      r'|>\s*$|>\s*\/\w*'           // ASCII > prompt
+      r'|\?\s*for\s+shortcuts'      // "? for shortcuts" hint
+      r'|Esc to interrupt'
+      r'|Press (?:Ctrl|⌃)\+C'
+      r'|Running\s+tool.*'
+      r'|Tool:\s.*'
+      r'|⎿\s.*'
+      r'|╰─.*'
+      r'|╭─.*'
+      r')$',
       caseSensitive: false,
     ).hasMatch(line);
+  }
+
+  /// Strips Claude CLI's response-indicator prefix characters (e.g. ⏺) that
+  /// appear at the start of response lines but are not part of the content.
+  String _stripResponseIndicatorPrefix(String line) {
+    return line.replaceFirst(RegExp(r'^[⏺]\s*'), '');
   }
 
   bool _isDecorationLine(String line) {
@@ -145,6 +163,9 @@ class ClaudeChatParser {
 
   String _stripAnsi(String value) {
     var output = value;
+    // Claude CLI uses \u001b[1C (cursor-forward-1) as a word separator.
+    // Convert it to a real space before stripping other sequences.
+    output = output.replaceAll('\x1B[1C', ' ');
     output = output.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
     output = output.replaceAll(
       RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
@@ -156,7 +177,10 @@ class ClaudeChatParser {
   }
 
   String _resolveCarriageReturns(String value) {
-    return value
+    // Claude CLI renders the input prompt via "\r❯ ..." after the response text
+    // on the same raw line. Strip that suffix so the response text is preserved.
+    final stripped = value.replaceAll(RegExp(r'\r[❯>?][^\n]*'), '');
+    return stripped
         .split('\n')
         .map((line) {
           if (!line.contains('\r')) return line;

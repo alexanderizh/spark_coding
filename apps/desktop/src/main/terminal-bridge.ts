@@ -93,6 +93,9 @@ export class TerminalBridge extends EventEmitter {
   // Keepalive
   private pingInterval?: NodeJS.Timeout
 
+  // Pending runtime status to send after reconnect
+  private pendingRuntimeStatus?: RuntimeStatusPayload
+
   // ── Public API ───────────────────────────────────────────────────────────────
 
   getStatus(): BridgeStatus {
@@ -157,6 +160,7 @@ export class TerminalBridge extends EventEmitter {
     this.socket = undefined
     this.isPaired = false
     this.outputSeq = 0
+    this.pendingRuntimeStatus = undefined
     this.setStatus('stopped', 'Session stopped')
   }
 
@@ -176,10 +180,23 @@ export class TerminalBridge extends EventEmitter {
       this.setStatus('waiting', 'Waiting for mobile to pair…')
       // Re-emit QR info after reconnect so renderer can re-render it
       if (this.qrInfo) this.emit('qr', this.qrInfo)
+      // Re-emit runtime status if Claude is already running
+      if (this.ptyProcess && this.sessionId) {
+        this.emitRuntimeStatus({
+          sessionId: this.sessionId,
+          cliType: CliTypes.CLAUDE,
+          ready: true,
+          started: false,
+          timestamp: Date.now(),
+        })
+      }
     })
 
     socket.on('reconnect', () => {
-      // re-register handled by 'connect' event
+      // Re-emit pending runtime status after reconnect
+      if (this.pendingRuntimeStatus && this.sessionId) {
+        this.socket?.emit(Events.RUNTIME_STATUS, this.pendingRuntimeStatus)
+      }
     })
 
     socket.on('disconnect', (_reason: string) => {
@@ -228,6 +245,7 @@ export class TerminalBridge extends EventEmitter {
       if (payload.cliType !== CliTypes.CLAUDE) {
         return
       }
+      // If Claude is already running, respond immediately
       if (this.ptyProcess) {
         this.emitRuntimeStatus({
           sessionId: this.sessionId!,
@@ -238,13 +256,26 @@ export class TerminalBridge extends EventEmitter {
         })
         return
       }
+      // Try to spawn Claude if not already running
+      if (!this.config) {
+        this.emitRuntimeStatus({
+          sessionId: this.sessionId!,
+          cliType: CliTypes.CLAUDE,
+          ready: false,
+          started: false,
+          message: 'Configuration not initialized',
+          timestamp: Date.now(),
+        })
+        return
+      }
       this.spawnClaude()
+      // Emit status after spawning (pty.spawn is synchronous)
       this.emitRuntimeStatus({
         sessionId: this.sessionId!,
         cliType: CliTypes.CLAUDE,
         ready: !!this.ptyProcess,
         started: !!this.ptyProcess,
-        message: this.ptyProcess ? undefined : 'Claude CLI 启动失败',
+        message: this.ptyProcess ? undefined : 'Claude CLI failed to start',
         timestamp: Date.now(),
       })
     })
@@ -305,10 +336,13 @@ export class TerminalBridge extends EventEmitter {
   }
 
   private emitRuntimeStatus(payload: RuntimeStatusPayload): void {
-    if (!this.socket?.connected) {
-      return
+    // Store as pending in case socket is not connected
+    this.pendingRuntimeStatus = payload
+
+    // Emit if socket is connected
+    if (this.socket?.connected) {
+      this.socket.emit(Events.RUNTIME_STATUS, payload)
     }
-    this.socket.emit(Events.RUNTIME_STATUS, payload)
   }
 
   // ── Output batching (~60fps) ──────────────────────────────────────────────────
@@ -423,5 +457,6 @@ export class TerminalBridge extends EventEmitter {
     this.qrInfo = undefined
     this.sessionId = undefined
     this.token = undefined
+    this.pendingRuntimeStatus = undefined
   }
 }

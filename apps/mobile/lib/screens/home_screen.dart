@@ -239,7 +239,7 @@ class _LinkCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${link.cliType.value} · ${link.serverUrl}',
+                      link.cliType.value,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

@@ -100,12 +100,12 @@ export class RelayController {
 
       if (meta.role === 'agent') {
         await this.sessionService.updateState(meta.sessionId, {
-          state: SessionState.MOBILE_DISCONNECTED,
+          state: SessionState.AGENT_DISCONNECTED,
           agentSocketId: null,
         });
       } else {
         await this.sessionService.updateState(meta.sessionId, {
-          state: session.agentSocketId ? SessionState.AGENT_DISCONNECTED : SessionState.WAITING_FOR_AGENT,
+          state: session.agentSocketId ? SessionState.MOBILE_DISCONNECTED : SessionState.WAITING_FOR_AGENT,
           mobileSocketId: null,
         });
       }
@@ -139,12 +139,25 @@ export class RelayController {
       typeof payload.hostname === 'string' ? payload.hostname.trim() : '';
     meta.agentHostname = hostname || null;
 
+    const hasMobile = !!session.mobileSocketId;
+    const nextState = hasMobile ? SessionState.PAIRED : SessionState.WAITING_FOR_MOBILE;
+    const now = new Date();
     await this.sessionService.updateState(meta.sessionId, {
-      state: SessionState.WAITING_FOR_MOBILE,
+      state: nextState,
       agentSocketId: socket.id,
       agentPlatform: payload.platform,
       agentHostname: meta.agentHostname,
+      pairedAt: hasMobile ? session.pairedAt ?? now : session.pairedAt,
     });
+
+    if (hasMobile) {
+      const pairPayload: SessionPairPayload = {
+        sessionId: meta.sessionId,
+        mobileDeviceId: session.mobileDeviceId ?? 'unknown_device',
+        pairedAt: (session.pairedAt ?? now).getTime(),
+      };
+      this.app.to(meta.sessionId).emit(Events.SESSION_PAIR, pairPayload);
+    }
 
     const updated = await this.sessionService.findById(meta.sessionId);
     if (updated) this.broadcastState(meta.sessionId, updated);
@@ -187,26 +200,24 @@ export class RelayController {
     const session = await this.sessionService.findById(meta.sessionId);
     if (!session) return;
 
-    if (!session.agentSocketId) {
-      this.sendError(SessionErrorCode.SESSION_NOT_FOUND, 'Agent is not yet connected');
-      return;
-    }
-
     const now = new Date();
+    const hasAgent = !!session.agentSocketId;
+    const nextState = hasAgent ? SessionState.PAIRED : SessionState.WAITING_FOR_AGENT;
     await this.sessionService.updateState(meta.sessionId, {
-      state: SessionState.PAIRED,
+      state: nextState,
       mobileSocketId: socket.id,
       mobileDeviceId: payload.deviceId,
-      pairedAt: session.pairedAt ?? now,
+      pairedAt: hasAgent ? session.pairedAt ?? now : session.pairedAt,
     });
 
-    const pairPayload: SessionPairPayload = {
-      sessionId: meta.sessionId,
-      mobileDeviceId: payload.deviceId,
-      pairedAt: (session.pairedAt ?? now).getTime(),
-    };
-    // Notify both agent and mobile
-    this.app.to(meta.sessionId).emit(Events.SESSION_PAIR, pairPayload);
+    if (hasAgent) {
+      const pairPayload: SessionPairPayload = {
+        sessionId: meta.sessionId,
+        mobileDeviceId: payload.deviceId,
+        pairedAt: (session.pairedAt ?? now).getTime(),
+      };
+      this.app.to(meta.sessionId).emit(Events.SESSION_PAIR, pairPayload);
+    }
 
     const updated = await this.sessionService.findById(meta.sessionId);
     if (updated) this.broadcastState(meta.sessionId, updated);

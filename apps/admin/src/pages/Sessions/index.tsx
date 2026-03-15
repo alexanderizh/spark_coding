@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Table, Select, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth } from '@/contexts/AuthContext';
-import { getSessions, type SessionItem } from '@/api/client';
+import { getSessions, connectionLink, type SessionItem } from '@/api/client';
 import styles from './index.module.less';
 
 const STATE_LABELS: Record<string, string> = {
@@ -64,6 +64,16 @@ export default function SessionsPage() {
 
   const columns: ColumnsType<SessionItem> = [
     {
+      title: '连接',
+      key: 'connection',
+      ellipsis: true,
+      render: (_: unknown, record: SessionItem) => (
+        <span className={styles.connectionLink} title={connectionLink(record)}>
+          {connectionLink(record)}
+        </span>
+      ),
+    },
+    {
       title: '状态',
       dataIndex: 'state',
       key: 'state',
@@ -73,20 +83,6 @@ export default function SessionsPage() {
           {STATE_LABELS[state] ?? state}
         </Tag>
       ),
-    },
-    {
-      title: '主机平台',
-      dataIndex: 'agentPlatform',
-      key: 'agentPlatform',
-      ellipsis: true,
-      render: (v: string | null) => v ?? '—',
-    },
-    {
-      title: '设备 ID',
-      dataIndex: 'mobileDeviceId',
-      key: 'mobileDeviceId',
-      ellipsis: true,
-      render: (v: string | null) => v ?? '—',
     },
     {
       title: '配对时间',

@@ -38,17 +38,19 @@ export class AdminController {
     };
   }
 
-  /** Admin: list sessions (host-app bindings) with pagination */
+  /** Admin: list sessions (host-app bindings) with pagination, 默认按连接去重 */
   @Get('/sessions')
   async listSessions(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @Query('state') state?: SessionState
+    @Query('state') state?: SessionState,
+    @Query('groupByConnection') groupByConnection?: string
   ) {
     const { sessions, total } = await this.sessionService.listSessions({
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
       state,
+      groupByConnection: groupByConnection !== 'false',
     });
 
     const items = sessions.map(s => ({
@@ -58,6 +60,7 @@ export class AdminController {
       agentSocketId: s.agentSocketId,
       mobileSocketId: s.mobileSocketId,
       agentPlatform: s.agentPlatform,
+      agentHostname: s.agentHostname,
       mobileDeviceId: s.mobileDeviceId,
       pairedAt: s.pairedAt?.getTime() ?? null,
       lastActivityAt: s.lastActivityAt.getTime(),

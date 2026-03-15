@@ -54,3 +54,17 @@ CLI 参数 `--server-url` 可临时覆盖。
 - `claude` 已在运行：回传 `runtime:status`（`ready=true, started=false`）。
 - `claude` 未运行：尝试 `pty.spawn()`，成功回传 `ready=true, started=true`。
 - 启动失败：回传 `ready=false` 与错误 `message`，不要静默吞错。
+
+## 包装器输出约定
+
+- terminal agent 作为 Claude 包装器时，PTY 输出需同时透传到本地 stdout 与远端 `terminal:output` 事件。
+- 连接状态需在本地输出，至少覆盖 `connected / reconnected / disconnected / session:*`。
+- Claude 启动状态需在本地输出，至少覆盖 `starting / started / already_running / failed`。
+- Claude 输入需输出可观测日志（字节数 + 转义预览），避免仅保留黑盒转发。
+
+## 启动前环境预检
+
+- terminal 启动时先做环境预检，再创建会话。
+- 预检必须至少包含：Claude CLI 可用性、服务端可访问性。
+- 预检结果必须以中文输出，并显式标识成功/失败。
+- 预检失败要给出可执行的修复提示（安装 CLI 或启动 server），并终止启动流程。

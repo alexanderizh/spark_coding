@@ -1,0 +1,22 @@
+---
+description: Mobile 端敏感信息脱敏与展示安全规范
+globs: apps/mobile/**/*
+alwaysApply: false
+---
+
+# Mobile 安全脱敏规范
+
+## UI 展示约束
+
+- 列表页、详情页、状态页禁止展示服务器地址、端口、完整 URL、token、session token 等敏感连接信息
+- 连接卡片副标题仅展示非敏感字段（如 cli 类型、在线状态、主机别名）
+
+## 日志与异常约束
+
+- 禁止在 `debugPrint`、logger、异常上报中输出服务器地址、token、鉴权头与完整连接串
+- 网络异常提示需使用通用文案，不拼接后端地址与内部网络拓扑信息
+
+## 开发与评审检查点
+
+- 新增或修改连接列表 UI 时，检查是否直接渲染 `serverUrl`、`token`、`sessionId` 等字段
+- 提交前执行静态检查，确保无敏感字段直接用于文案展示与日志输出

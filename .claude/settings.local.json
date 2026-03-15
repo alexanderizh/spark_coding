@@ -10,7 +10,10 @@
       "Bash(cd:*)",
       "Bash(npx electron-vite:*)",
       "Bash(timeout:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(npm run:*)",
+      "Bash(find:*)",
+      "Bash(claude:*)"
     ]
   }
 }

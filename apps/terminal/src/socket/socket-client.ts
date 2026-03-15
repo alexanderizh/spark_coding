@@ -54,6 +54,7 @@ export class AgentSocketClient {
     // ── PTY manager ───────────────────────────────────────────────────────────
     this.pty = new PtyManager(
       (data: string, seq: number) => {
+        this.writeClaudeOutput(data);
         if (!this.socket.connected) return;
         const payload: TerminalOutputPayload = {
           sessionId: this.sessionId,
@@ -92,14 +93,17 @@ export class AgentSocketClient {
       };
       this.socket.emit(Events.AGENT_REGISTER, payload);
       console.log('[socket] Connected to server, waiting for mobile…');
+      this.logConnectionState('connected');
     });
 
     this.socket.on('reconnect', () => {
       console.log('[socket] Reconnected — re-registering agent');
+      this.logConnectionState('reconnected');
     });
 
     this.socket.on('disconnect', (reason: string) => {
       console.log(`[socket] Disconnected: ${reason}. PTY keeps running.`);
+      this.logConnectionState(`disconnected (${reason})`);
     });
 
     // ── Paired: spawn Claude CLI ───────────────────────────────────────────
@@ -121,11 +125,20 @@ export class AgentSocketClient {
       this.isPaired = true;
       console.log(`[session] Paired with mobile device: ${payload.mobileDeviceId}`);
       console.log('[pty] Spawning Claude CLI…\n');
-      this.pty.spawn(config);
+      try {
+        this.logClaudeStartupState('starting');
+        this.pty.spawn(config);
+        this.logClaudeStartupState('started');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logClaudeStartupState(`failed (${message})`);
+        throw err;
+      }
     });
 
     // ── Session state updates ─────────────────────────────────────────────
     this.socket.on(Events.SESSION_STATE, (payload: SessionStatePayload) => {
+      this.logConnectionState(`session:${payload.state}`);
       if (payload.state === SessionState.MOBILE_DISCONNECTED) {
         console.log('\n[session] Mobile disconnected — Claude keeps running, waiting for reconnect…');
       }
@@ -133,6 +146,7 @@ export class AgentSocketClient {
 
     // ── Input from mobile ─────────────────────────────────────────────────
     this.socket.on(Events.TERMINAL_INPUT, (payload: TerminalInputPayload) => {
+      this.logClaudeInput(payload.data);
       this.pty.write(payload.data);
     });
 
@@ -144,6 +158,7 @@ export class AgentSocketClient {
     this.socket.on(Events.RUNTIME_ENSURE, (payload: RuntimeEnsurePayload) => {
       if (payload.cliType !== CliTypes.CLAUDE) return;
       if (this.pty.isAlive()) {
+        this.logClaudeStartupState('already_running');
         this.emitRuntimeStatus({
           sessionId: this.sessionId,
           cliType: CliTypes.CLAUDE,
@@ -154,7 +169,9 @@ export class AgentSocketClient {
         return;
       }
       try {
+        this.logClaudeStartupState('starting');
         this.pty.spawn(config);
+        this.logClaudeStartupState('started');
         this.emitRuntimeStatus({
           sessionId: this.sessionId,
           cliType: CliTypes.CLAUDE,
@@ -164,6 +181,7 @@ export class AgentSocketClient {
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        this.logClaudeStartupState(`failed (${message})`);
         this.emitRuntimeStatus({
           sessionId: this.sessionId,
           cliType: CliTypes.CLAUDE,
@@ -205,5 +223,32 @@ export class AgentSocketClient {
   private emitRuntimeStatus(payload: RuntimeStatusPayload): void {
     if (!this.socket.connected) return;
     this.socket.emit(Events.RUNTIME_STATUS, payload);
+  }
+
+  private logConnectionState(state: string): void {
+    console.log(`[connection] ${state}`);
+  }
+
+  private logClaudeStartupState(state: string): void {
+    console.log(`[claude:startup] ${state}`);
+  }
+
+  private logClaudeInput(data: string): void {
+    const bytes = Buffer.byteLength(data, 'utf8');
+    const escaped = this.escapeForLog(data);
+    const preview = escaped.slice(0, 120);
+    const suffix = preview.length < escaped.length ? '…' : '';
+    console.log(`[claude:input] bytes=${bytes} data="${preview}${suffix}"`);
+  }
+
+  private writeClaudeOutput(data: string): void {
+    process.stdout.write(data);
+  }
+
+  private escapeForLog(data: string): string {
+    return data
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t');
   }
 }

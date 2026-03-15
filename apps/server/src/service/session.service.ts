@@ -94,10 +94,15 @@ export class SessionService {
     page?: number;
     limit?: number;
     state?: SessionState;
+    groupByConnection?: boolean;
   }): Promise<{ sessions: Session[]; total: number }> {
     const page = Math.max(1, options.page ?? 1);
     const limit = Math.min(100, Math.max(1, options.limit ?? 20));
     const skip = (page - 1) * limit;
+
+    if (options.groupByConnection) {
+      return this.listSessionsGroupedByConnection({ page, limit, skip, state: options.state });
+    }
 
     const qb = this.sessionRepo
       .createQueryBuilder('s')
@@ -108,6 +113,65 @@ export class SessionService {
     }
 
     const [sessions, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    return { sessions, total };
+  }
+
+  /** 按连接去重：同一主机+手机只保留最新一条 */
+  private async listSessionsGroupedByConnection(options: {
+    page: number;
+    limit: number;
+    skip: number;
+    state?: SessionState;
+  }): Promise<{ sessions: Session[]; total: number }> {
+    const stateCond = options.state ? ' AND s.state = ?' : '';
+    const idsParams: unknown[] = options.state
+      ? [options.state, options.limit, options.skip]
+      : [options.limit, options.skip];
+    const countParams: unknown[] = options.state ? [options.state] : [];
+
+    const idsSql = `
+      WITH ranked AS (
+        SELECT s.id, s.last_activity_at,
+          ROW_NUMBER() OVER (
+            PARTITION BY COALESCE(s.agent_hostname, s.agent_platform, '') || '|' || COALESCE(s.mobile_device_id, '')
+            ORDER BY s.last_activity_at DESC
+          ) AS rn
+        FROM sessions s
+        WHERE 1=1 ${stateCond}
+      )
+      SELECT id FROM ranked WHERE rn = 1
+      ORDER BY last_activity_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const countSql = `
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(agent_hostname, agent_platform, '') || '|' || COALESCE(mobile_device_id, '')
+          ORDER BY last_activity_at DESC
+        ) AS rn
+        FROM sessions
+        WHERE 1=1 ${stateCond}
+      )
+      SELECT COUNT(*) AS cnt FROM ranked WHERE rn = 1
+    `;
+
+    const rawIds = await this.sessionRepo.query(idsSql, idsParams);
+    const idList = rawIds.map((r: { id: string }) => r.id);
+
+    const totalResult = await this.sessionRepo.query(countSql, countParams);
+    const total = totalResult.length ? parseInt(totalResult[0].cnt, 10) : 0;
+
+    if (idList.length === 0) {
+      return { sessions: [], total };
+    }
+
+    const sessions = await this.sessionRepo
+      .createQueryBuilder('s')
+      .whereInIds(idList)
+      .orderBy('s.last_activity_at', 'DESC')
+      .getMany();
+
     return { sessions, total };
   }
 
