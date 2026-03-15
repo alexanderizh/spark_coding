@@ -21,10 +21,7 @@ import '../widgets/input_toolbar.dart';
 // ---------------------------------------------------------------------------
 
 class _PendingPrompt {
-  _PendingPrompt({
-    required this.type,
-    required this.rawText,
-  });
+  _PendingPrompt({required this.type, required this.rawText});
 
   final ClaudePromptType type;
   final String rawText;
@@ -59,7 +56,11 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   @override
   void initState() {
     super.initState();
+    final socketService = ref.read(socketServiceProvider);
     _terminal = Terminal(maxLines: 10000);
+    _terminal.onResize = (cols, rows, pixelWidth, pixelHeight) {
+      socketService.sendResize(cols, rows);
+    };
     _connectionNotifier = ref.read(connectionNotifierProvider.notifier);
     _listenForErrors();
     _listenForSnapshot();
@@ -88,7 +89,10 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _errorSub = socketService.sessionErrors.listen((error) {
       AppLogger.error('TerminalScreen', '收到服务端 session 错误', error.message);
       if (!mounted) return;
-      if (_runtimeEnsuring) setState(() { _runtimeEnsuring = false; });
+      if (_runtimeEnsuring)
+        setState(() {
+          _runtimeEnsuring = false;
+        });
       _showSessionError(error.message);
     });
   }
@@ -393,9 +397,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                   )
                 : const SizedBox.shrink(key: ValueKey('no_banner')),
           ),
-          Expanded(
-            child: _buildTerminalContent(),
-          ),
+          Expanded(child: _buildTerminalContent()),
           InputToolbar(
             onSendMessage: _sendMessage,
             onTypingChanged: _handleTypingChanged,
@@ -426,7 +428,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
             height: 10,
             child: CircularProgressIndicator(
               strokeWidth: 1.5,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE5C07B)),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB38600)),
             ),
           ),
           SizedBox(width: 5),
@@ -434,7 +436,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
             '正在检查 Claude...',
             style: TextStyle(
               fontSize: 11,
-              color: Color(0xFFE5C07B),
+              color: Color(0xFFB38600),
               fontWeight: FontWeight.normal,
             ),
           ),
@@ -459,8 +461,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     }
 
     return AppBar(
-      backgroundColor: const Color(0xFF16213E),
-      foregroundColor: const Color(0xFFE0E0E0),
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black87,
       centerTitle: false,
       titleSpacing: 0,
       leading: IconButton(
@@ -503,10 +505,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
               ),
             ],
           ),
-          if (statusLine != null) ...[
-            const SizedBox(height: 1),
-            statusLine,
-          ],
+          if (statusLine != null) ...[const SizedBox(height: 1), statusLine],
         ],
       ),
       actions: [
