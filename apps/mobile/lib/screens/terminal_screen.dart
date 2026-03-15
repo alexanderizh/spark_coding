@@ -460,7 +460,11 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       titleSpacing: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios, size: 18),
-        onPressed: () {
+        onPressed: () async {
+          // 退出终端前主动断开 socket，让服务端及时更新会话状态，
+          // 同时避免旧连接断开与新连接建立之间的竞态条件
+          await ref.read(connectionNotifierProvider.notifier).disconnect();
+          if (!context.mounted) return;
           if (context.canPop()) {
             context.pop();
           } else {

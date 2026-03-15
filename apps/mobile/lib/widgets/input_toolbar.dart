@@ -43,13 +43,17 @@ class _InputToolbarState extends State<InputToolbar> {
 
   // Key shortcuts: label → raw terminal sequence
   static const _keyShortcuts = <({String label, String seq, IconData? icon})>[
-    (label: 'Esc', seq: '\x1b', icon: null),
-    (label: '↑', seq: '\x1b[A', icon: null),
-    (label: '↓', seq: '\x1b[B', icon: null),
-    (label: '←', seq: '\x1b[D', icon: null),
-    (label: '→', seq: '\x1b[C', icon: null),
+    (label: ' ! ', seq: '\x21', icon: null),
+    (label: ' ↑ ', seq: '\x1b[A', icon: null),
+    (label: ' ↓ ', seq: '\x1b[B', icon: null),
+    (label: ' ← ', seq: '\x1b[D', icon: null),
+    (label: ' → ', seq: '\x1b[C', icon: null),
     (label: 'Tab', seq: '\t', icon: null),
     (label: '回车', seq: '\r', icon: null),
+    (label: ' @ ', seq: '\x40', icon: null),
+    (label: 'Esc', seq: '\x1b', icon: null),
+    // Backspace
+    (label: 'Backspace', seq: '\x7f', icon: null),
   ];
 
   @override
@@ -269,15 +273,21 @@ class _InputToolbarState extends State<InputToolbar> {
                 height: 42,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: _hasText ? Colors.black : const Color(0xFF9E9E9E),
+                    color: Colors.black,
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    onPressed: _hasText ? _send : null,
-                    icon: Icon(_hasText ? Icons.send_rounded : Icons.mic_none),
+                    onPressed: () {
+                      if (_hasText) {
+                        _send();
+                      } else {
+                        _sendRaw('\r');
+                      }
+                    },
+                    icon: const Icon(Icons.send_rounded),
                     color: Colors.white,
                     splashRadius: 20,
-                    tooltip: _hasText ? '发送' : '语音',
+                    tooltip: '发送',
                   ),
                 ),
               ),

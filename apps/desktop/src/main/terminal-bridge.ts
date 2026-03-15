@@ -353,11 +353,13 @@ export class TerminalBridge extends EventEmitter {
 
     // Mobile paired → spawn Claude + save PairedSessionRecord
     socket.on(Events.SESSION_PAIR, (payload: SessionPairPayload) => {
-      this.log('收到 session:pair mobileDeviceId=%s', payload.mobileDeviceId)
-      if (this.isPaired) {
-        // Mobile reconnected → restore paired status + send snapshot
-        this.setStatus('paired', `Reconnected with ${payload.mobileDeviceId}`)
-        const snap = this.xtermSnapshot || this.snapshotBuffer
+      this.log('收到 session:pair mobileDeviceId=%s isPaired=%s ptyRunning=%s', payload.mobileDeviceId, this.isPaired, !!this.ptyProcess)
+      this.isPaired = true
+      this.setStatus('paired', `Paired with ${payload.mobileDeviceId}`)
+
+      const snap = this.xtermSnapshot || this.snapshotBuffer
+      if (this.ptyProcess) {
+        // Claude 进程仍在运行（移动端重连）→ 直接发送快照，无需重新启动
         if (snap && socket.connected && this.sessionId) {
           try {
             socket.emit(Events.TERMINAL_SNAPSHOT, {
@@ -373,9 +375,8 @@ export class TerminalBridge extends EventEmitter {
         }
         return
       }
-      this.isPaired = true
-      this.setStatus('paired', `Paired with ${payload.mobileDeviceId}`)
 
+      // Claude 未运行 → 首次配对或进程已退出，启动 Claude
       try {
         this.spawnClaude()
       } catch (err) {
@@ -409,11 +410,10 @@ export class TerminalBridge extends EventEmitter {
     socket.on(Events.SESSION_STATE, (payload: SessionStatePayload) => {
       this.log('收到 session:state state=%s', payload.state)
       if (payload.state === SessionState.MOBILE_DISCONNECTED) {
-        this.log('Mobile 断开连接，终止 Claude 进程')
-        try { this.ptyProcess?.kill() } catch { /* ignore */ }
-        this.ptyProcess = undefined
+        // Mobile 断开连接：保持 Claude 进程继续运行，等待移动端重连
+        // 不杀死 Claude，避免重连后需要重新启动带来的延迟
         this.isPaired = false
-        this.setStatus('waiting', 'Mobile disconnected — Claude stopped')
+        this.setStatus('waiting', 'Mobile disconnected — waiting for reconnect')
       }
       if (payload.state === SessionState.PAIRED && !this.isPaired) {
         this.isPaired = true
