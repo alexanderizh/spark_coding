@@ -132,15 +132,6 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
   }) async {
     AppLogger.info('Connection', 'connect 调用 — sessionId: $sessionId');
 
-    // Only skip if already connecting to the *same* server — prevents double-connect
-    // on rapid taps. Allow reconnect if already connected (user switched sessions or
-    // returned from terminal screen after disconnect).
-    if (state.status == ConnectionStatus.connecting &&
-        state.serverUrl == serverUrl) {
-      AppLogger.warn('Connection', '正在连接同一服务器，跳过重复请求');
-      return;
-    }
-
     state = AppConnectionState(
       status: ConnectionStatus.connecting,
       serverUrl: serverUrl,
