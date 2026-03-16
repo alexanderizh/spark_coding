@@ -90,6 +90,11 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
 
   StreamSubscription<SocketConnectionStatus>? _statusSub;
 
+  /// Tracks the sessionId currently being connected to.
+  /// Used to deduplicate rapid calls with the same target session
+  /// (e.g. scanner_screen + terminal_screen both calling connect()).
+  String? _connectingSessionId;
+
   void _listenToSocketStatus() {
     _statusSub = _socketService.connectionStatus.listen((socketStatus) {
       AppLogger.info('Connection', 'Socket 状态变更: $socketStatus');
@@ -132,6 +137,18 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
   }) async {
     AppLogger.info('Connection', 'connect 调用 — sessionId: $sessionId');
 
+    // Deduplicate: if we are already connecting/connected to this exact session,
+    // skip. This prevents the scanner_screen + terminal_screen double-connect
+    // race where scanner calls connect() then immediately pushes terminal which
+    // calls connect() again with the same sessionId.
+    if (_connectingSessionId == sessionId &&
+        (state.status == ConnectionStatus.connecting ||
+         state.status == ConnectionStatus.connected)) {
+      AppLogger.info('Connection', '已在连接相同 sessionId，跳过重复请求');
+      return;
+    }
+
+    _connectingSessionId = sessionId;
     state = AppConnectionState(
       status: ConnectionStatus.connecting,
       serverUrl: serverUrl,
@@ -183,6 +200,7 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
 
   /// Closes the socket connection.
   Future<void> disconnect() async {
+    _connectingSessionId = null;
     await _socketService.disconnect();
     state = const AppConnectionState(status: ConnectionStatus.disconnected);
   }
