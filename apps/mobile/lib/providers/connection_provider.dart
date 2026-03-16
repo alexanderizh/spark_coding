@@ -92,10 +92,7 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
 
   void _listenToSocketStatus() {
     _statusSub = _socketService.connectionStatus.listen((socketStatus) {
-      AppLogger.info(
-        'Connection',
-        'Socket 状态变更: $socketStatus',
-      );
+      AppLogger.info('Connection', 'Socket 状态变更: $socketStatus');
       switch (socketStatus) {
         case SocketConnectionStatus.connected:
           AppLogger.info('Connection', '已连接到中继服务器');
@@ -129,10 +126,7 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
     required String token,
     required String sessionId,
   }) async {
-    AppLogger.info(
-      'Connection',
-      'connect 调用 — sessionId: $sessionId',
-    );
+    AppLogger.info('Connection', 'connect 调用 — sessionId: $sessionId');
 
     // Only skip if already connecting to the *same* server — prevents double-connect
     // on rapid taps. Allow reconnect if already connected (user switched sessions or
@@ -152,6 +146,20 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
       AppLogger.info('Connection', '正在生成 deviceId...');
       final deviceId = await _sessionService.generateDeviceId();
       AppLogger.info('Connection', 'deviceId 已生成: $deviceId');
+
+      if (_socketService.isConnected && state.serverUrl == serverUrl) {
+        AppLogger.info('Connection', '连接已存在，重发 mobile:join 校准会话');
+        _socketService.rejoin(
+          token: token,
+          sessionId: sessionId,
+          deviceId: deviceId,
+        );
+        state = AppConnectionState(
+          status: ConnectionStatus.connected,
+          serverUrl: serverUrl,
+        );
+        return;
+      }
 
       AppLogger.info('Connection', '正在调用 SocketService.connect...');
       await _socketService.connect(

@@ -15,8 +15,19 @@ alwaysApply: false
 - 终端 UI 必须在每次收到新输出时自动滚动到底部，行为与常见聊天应用一致。
 - 键盘展开导致 `MediaQuery.viewInsets.bottom` 增大时，也需要自动滚动到底部，防止最新输出被输入区遮挡。
 - 滚动需要节流到每帧一次（使用 `addPostFrameCallback` + 标记位），并在 `ScrollController.hasClients` 且 `position.hasContentDimensions` 时再执行 `jumpTo(maxScrollExtent)`。
+- 终端重连后若出现“需点击输入框或收起展开键盘才恢复排版”，优先检查是否在 `terminal:snapshot/terminal:output` 到达后同时触发了“首次渲染刷新 + 帧内滚动到底部”。
 
 ## 终端内容留白
 
 - 终端内容区域需要提供上下内边距（例如 `TerminalView.padding`）以形成舒适留白，并为底部输入区域预留视觉空间。
 
+## 会话页自动展开键盘兜底
+
+- 当重连后终端初始排版在不同机型上仍有偶发异常时，可在进入会话页后延迟约 300ms 自动聚焦输入框，主动拉起键盘作为渲染兜底触发。
+- 自动聚焦需可配置（例如 `autoFocusDelayMs`），便于后续灰度或按场景关闭。
+
+## 返回列表后重进详情的连接校准
+
+- 终端页每次进入都要执行连接校准，确保触发一次完整 connect 流程并重新发送 `mobile:join`。
+- 不能只在 `disconnected/error` 状态下连接；否则 warm path（未杀进程）从列表重进时可能跳过 join，导致会话长期停留“主机名获取中 / 连接中”。
+- 若 Socket 已连接且服务地址未变化，优先复用现有连接并重发 `mobile:join`，避免先断开再重连导致页面短暂落入“与中继服务器断开连接”状态。

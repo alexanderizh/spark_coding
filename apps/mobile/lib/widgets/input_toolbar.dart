@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +12,7 @@ class InputToolbar extends StatefulWidget {
     required this.onSendMessage,
     this.onTypingChanged,
     this.onRawInput,
+    this.autoFocusDelayMs,
   });
 
   final MessageCallback onSendMessage;
@@ -17,6 +20,7 @@ class InputToolbar extends StatefulWidget {
 
   /// Sends a raw terminal sequence (no \r appended).
   final RawInputCallback? onRawInput;
+  final int? autoFocusDelayMs;
 
   @override
   State<InputToolbar> createState() => _InputToolbarState();
@@ -25,6 +29,8 @@ class InputToolbar extends StatefulWidget {
 class _InputToolbarState extends State<InputToolbar> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
+  final _groupId = Object();
+  Timer? _autoFocusTimer;
   bool _hasText = false;
   final List<({String command, String title, String desc})> _commands = const [
     (command: '/help', title: '帮助', desc: '查看可用命令'),
@@ -39,27 +45,38 @@ class _InputToolbarState extends State<InputToolbar> {
     (command: '/permissions', title: '权限设置', desc: '查看工具权限状态'),
     (command: '/review', title: '代码审查', desc: '让 Claude 审查当前改动'),
     (command: '/init', title: '初始化', desc: '初始化当前工作区能力'),
+    (command: '/plan', title: 'Plan 模式', desc: '进入计划模式，先规划再执行'),
+    (command: '/code', title: 'Code 模式', desc: '进入编码模式，直接执行开发任务'),
+    (command: '/ask', title: 'Ask 模式', desc: '进入问答模式，仅解释与分析问题'),
+    (command: '/architect', title: 'Architect 模式', desc: '进入架构模式，设计方案与权衡'),
+    (command: '/chat', title: 'Chat 模式', desc: '进入自由对话模式'),
   ];
 
   // Key shortcuts: label → raw terminal sequence
   static const _keyShortcuts = <({String label, String seq, IconData? icon})>[
+    (label: 'Esc', seq: '\x1b', icon: null),
     (label: ' ! ', seq: '\x21', icon: null),
     (label: ' ↑ ', seq: '\x1b[A', icon: null),
     (label: ' ↓ ', seq: '\x1b[B', icon: null),
     (label: ' ← ', seq: '\x1b[D', icon: null),
     (label: ' → ', seq: '\x1b[C', icon: null),
-    (label: 'Tab', seq: '\t', icon: null),
+    (label: 'Del', seq: '\x7f', icon: null),
     (label: '回车', seq: '\r', icon: null),
+    (label: 'Tab', seq: '\t', icon: null),
     (label: ' @ ', seq: '\x40', icon: null),
-    (label: 'Esc', seq: '\x1b', icon: null),
-    // Backspace
-    (label: 'Backspace', seq: '\x7f', icon: null),
   ];
 
   @override
   void initState() {
     super.initState();
     _focusNode.addListener(_handleFocusChanged);
+    final delayMs = widget.autoFocusDelayMs;
+    if (delayMs != null && delayMs >= 0) {
+      _autoFocusTimer = Timer(Duration(milliseconds: delayMs), () {
+        if (!mounted) return;
+        _focusNode.requestFocus();
+      });
+    }
   }
 
   Future<void> _handleFocusChanged() async {
@@ -69,6 +86,7 @@ class _InputToolbarState extends State<InputToolbar> {
 
   @override
   void dispose() {
+    _autoFocusTimer?.cancel();
     _focusNode.removeListener(_handleFocusChanged);
     _textController.dispose();
     _focusNode.dispose();
@@ -165,37 +183,40 @@ class _InputToolbarState extends State<InputToolbar> {
   }
 
   Widget _buildKeyBar() {
-    return SizedBox(
-      height: 34,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        itemCount: _keyShortcuts.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (context, index) {
-          final key = _keyShortcuts[index];
-          return GestureDetector(
-            onTap: () => _sendRaw(key.seq),
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 40),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: const Color(0xFFDDDDDD)),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                key.label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+    return TapRegion(
+      groupId: _groupId,
+      child: SizedBox(
+        height: 34,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          itemCount: _keyShortcuts.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 6),
+          itemBuilder: (context, index) {
+            final key = _keyShortcuts[index];
+            return GestureDetector(
+              onTap: () => _sendRaw(key.seq),
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: const Color(0xFFDDDDDD)),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  key.label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -237,33 +258,39 @@ class _InputToolbarState extends State<InputToolbar> {
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: const Color(0xFFE0E0E0)),
                   ),
-                  child: TextField(
-                    controller: _textController,
-                    focusNode: _focusNode,
-                    minLines: 1,
-                    maxLines: 12,
-                    textInputAction: TextInputAction.newline,
-                    onSubmitted: (_) => _send(),
+                  child: TapRegion(
+                    groupId: _groupId,
                     onTapOutside: (_) => _focusNode.unfocus(),
-                    onChanged: (value) {
-                      final next = value.trim().isNotEmpty;
-                      if (next != _hasText) {
-                        setState(() => _hasText = next);
-                        widget.onTypingChanged?.call(next);
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      hintText: '输入消息',
-                      filled: false,
-                      fillColor: Colors.transparent,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    child: TextField(
+                      controller: _textController,
+                      focusNode: _focusNode,
+                      minLines: 1,
+                      maxLines: 12,
+                      textInputAction: TextInputAction.newline,
+                      onSubmitted: (_) => _send(),
+                      onChanged: (value) {
+                        final next = value.trim().isNotEmpty;
+                        if (next != _hasText) {
+                          setState(() => _hasText = next);
+                          widget.onTypingChanged?.call(next);
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        hintText: '输入消息',
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.black87,
+                      ),
                     ),
-                    style: const TextStyle(fontSize: 15, color: Colors.black87),
                   ),
                 ),
               ),
@@ -272,7 +299,7 @@ class _InputToolbarState extends State<InputToolbar> {
                 width: 42,
                 height: 42,
                 child: DecoratedBox(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.black,
                     shape: BoxShape.circle,
                   ),

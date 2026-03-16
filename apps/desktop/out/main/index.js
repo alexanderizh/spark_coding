@@ -940,6 +940,7 @@ function collectMacAddresses() {
 let bridge = null;
 function setupIpc(getWindow) {
   electron.ipcMain.handle("device:getId", () => getOrCreateDeviceId());
+  electron.ipcMain.handle("device:getVersion", () => electron.app.getVersion());
   electron.ipcMain.handle("device:getStatus", () => {
     const settings = getSettings();
     const deviceId = getOrCreateDeviceId();

@@ -32,8 +32,12 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   StreamSubscription<TerminalSnapshot>? _snapshotSub;
   StreamSubscription<RuntimeStatusEvent>? _runtimeSub;
   late final Terminal _terminal;
+  final ScrollController _terminalScrollController = ScrollController();
   bool _isTyping = false;
   bool _runtimeEnsuring = false;
+  bool _terminalRendered = false;
+  bool _scrollScheduled = false;
+  double _lastViewInsetBottom = 0;
 
   @override
   void initState() {
@@ -57,6 +61,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _outputSub?.cancel();
     _snapshotSub?.cancel();
     _runtimeSub?.cancel();
+    _terminalScrollController.dispose();
     super.dispose();
   }
 
@@ -76,17 +81,38 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   void _listenForSnapshot() {
     final socketService = ref.read(socketServiceProvider);
 
-    // Full snapshot on reconnect — reset terminal then write plain text
     _snapshotSub = socketService.terminalSnapshot.listen((snap) {
       if (!mounted) return;
       _terminal.write('\x1B[2J\x1B[H');
       _terminal.write(snap.snapshot);
+      _renderAndScrollTerminal();
     });
 
-    // Incremental output — write raw ANSI data directly so colors/styles render
     _outputSub = socketService.terminalOutput.listen((output) {
       if (!mounted) return;
       _terminal.write(output.data);
+      _renderAndScrollTerminal();
+    });
+  }
+
+  void _renderAndScrollTerminal() {
+    if (!_terminalRendered && mounted) {
+      setState(() {
+        _terminalRendered = true;
+      });
+    }
+    _scheduleScrollToBottom();
+  }
+
+  void _scheduleScrollToBottom() {
+    if (_scrollScheduled || !mounted) return;
+    _scrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollScheduled = false;
+      if (!mounted || !_terminalScrollController.hasClients) return;
+      final position = _terminalScrollController.position;
+      if (!position.hasContentDimensions) return;
+      _terminalScrollController.jumpTo(position.maxScrollExtent);
     });
   }
 
@@ -161,17 +187,17 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     }
 
     final status = ref.read(connectionProvider);
-    if (status == ConnectionStatus.disconnected ||
-        status == ConnectionStatus.error) {
-      AppLogger.info('TerminalScreen', '进入终端页后发起连接，sessionId: ${session.sessionId}');
-      await ref
-          .read(connectionNotifierProvider.notifier)
-          .connect(
-            serverUrl: session.serverUrl,
-            token: session.token,
-            sessionId: session.sessionId,
-          );
-    }
+    AppLogger.info(
+      'TerminalScreen',
+      '进入终端页触发连接校准，sessionId: ${session.sessionId}，当前状态: $status',
+    );
+    await ref
+        .read(connectionNotifierProvider.notifier)
+        .connect(
+          serverUrl: session.serverUrl,
+          token: session.token,
+          sessionId: session.sessionId,
+        );
 
     if (!mounted) return;
     final latestSession = ref.read(sessionProvider);
@@ -245,10 +271,17 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   }
 
   Widget _buildTerminalContent() {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (bottomInset > _lastViewInsetBottom) {
+      _scheduleScrollToBottom();
+    }
+    _lastViewInsetBottom = bottomInset;
+
     return Stack(
       children: [
         TerminalView(
           _terminal,
+          scrollController: _terminalScrollController,
           readOnly: true,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           theme: const TerminalTheme(
@@ -336,6 +369,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
               onSendMessage: _sendMessage,
               onTypingChanged: _handleTypingChanged,
               onRawInput: _sendRawInput,
+              autoFocusDelayMs: 300,
             ),
           ],
         ),

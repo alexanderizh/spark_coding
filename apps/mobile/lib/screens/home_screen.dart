@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../app/app_restart.dart';
 import '../app/router.dart';
 import '../models/connection_link_model.dart';
 import '../providers/connection_provider.dart';
@@ -50,10 +49,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
   @override
   void didPopNext() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      AppRestart.restartApp(context);
-    });
+    ref.read(linkNotifierProvider.notifier).refreshStatus();
   }
 
   void _listenForDeletion() {

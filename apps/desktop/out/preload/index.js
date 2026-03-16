@@ -4,6 +4,7 @@ electron.contextBridge.exposeInMainWorld("api", {
   // ── Device ───────────────────────────────────────────────────────────────────
   getDeviceId: () => electron.ipcRenderer.invoke("device:getId"),
   getDeviceStatus: () => electron.ipcRenderer.invoke("device:getStatus"),
+  getAppVersion: () => electron.ipcRenderer.invoke("device:getVersion"),
   // ── Settings ─────────────────────────────────────────────────────────────────
   getSettings: () => electron.ipcRenderer.invoke("settings:get"),
   saveSettings: (patch) => electron.ipcRenderer.invoke("settings:save", patch),

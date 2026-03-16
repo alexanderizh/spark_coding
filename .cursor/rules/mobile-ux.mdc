@@ -38,3 +38,10 @@ alwaysApply: false
 ## 在线会话可删除
 
 - 在线/离线会话都应支持删除配对记录，交互尽量一致（例如都支持右滑删除并二次确认），避免用户误以为在线会话不可删除
+
+## 终端输入栏命令与快捷键维护
+
+- 命令快捷弹窗新增能力时，优先在 `InputToolbar._commands` 统一维护，保持“展示文案 + slash 命令 + 说明”一一对应，避免散落在多个页面。
+- Claude 模式切换命令至少包含 `/plan`，并可同时提供 `/code`、`/ask`、`/architect`、`/chat`，统一通过现有发送链路透传到终端。
+- 输入栏快捷键新增组合键时，需在 `_keyShortcuts` 中声明可读标签与原始序列，并复用 `onRawInput` 发送，避免新增分支逻辑。
+- 终端输入栏 UI 修改后，需执行 `flutter analyze lib/widgets/input_toolbar.dart` 并修复提示（例如可加 `const` 的构造器）后再提交。

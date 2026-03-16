@@ -157,6 +157,23 @@ class SocketService {
     // when autoConnect is true (which is the default).
   }
 
+  void rejoin({
+    required String token,
+    required String sessionId,
+    required String deviceId,
+  }) {
+    final socket = _socket;
+    if (socket == null || !socket.connected) return;
+    _currentSessionId = sessionId;
+    socket.emit('mobile:join', {
+      'sessionToken': token,
+      'deviceId': deviceId,
+      'mobilePlatform': mobilePlatform,
+    });
+    AppLogger.info('SocketService', '已重发 mobile:join（复用现有连接）');
+    _startPing(sessionId);
+  }
+
   /// Sends a raw terminal input string to the host agent.
   void sendInput(String data) {
     if (!isConnected || _currentSessionId == null) return;
