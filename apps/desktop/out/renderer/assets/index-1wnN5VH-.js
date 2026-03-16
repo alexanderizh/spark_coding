@@ -17712,9 +17712,12 @@ function SettingsPage() {
   const [saved, setSaved] = reactExports.useState(false);
   const [detecting, setDetecting] = reactExports.useState(false);
   const [deviceId, setDeviceId] = reactExports.useState("");
+  const [appVersion, setAppVersion] = reactExports.useState("");
   reactExports.useEffect(() => {
     window.api.getSettings().then(setSettings);
     window.api.getDeviceId().then(setDeviceId).catch(() => {
+    });
+    window.api.getAppVersion().then(setAppVersion).catch(() => {
     });
   }, []);
   const handleChange = reactExports.useCallback((key, value) => {
@@ -17821,6 +17824,13 @@ function SettingsPage() {
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontWeight: 600, marginBottom: 6, color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em" }, children: "设备指纹 (Physical ID)" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("code", { style: { fontFamily: "monospace", fontSize: 12, color: "var(--accent)", wordBreak: "break-all" }, children: deviceId }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "form-hint", style: { marginTop: 4 }, children: "该 ID 由硬件信息生成，固定不变。手机端通过此 ID 识别本机" })
+    ] }),
+    appVersion && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 16, padding: "14px 20px", background: "var(--bg-card)", borderRadius: "var(--radius)", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontWeight: 600, color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em" }, children: "版本" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("code", { style: { fontFamily: "monospace", fontSize: 13, color: "var(--text-muted)" }, children: [
+        "v",
+        appVersion
+      ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 16, padding: "16px 20px", background: "var(--bg-card)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)", fontSize: 13 }, children: "快速上手" }),
