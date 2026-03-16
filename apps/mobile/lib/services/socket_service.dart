@@ -112,6 +112,7 @@ class SocketService {
   // ---------------------------------------------------------------------------
 
   bool get isConnected => _socket?.connected ?? false;
+  String? get currentSessionId => _currentSessionId;
   String get mobilePlatform => currentMobilePlatform();
 
   /// Establishes a Socket.IO connection to [serverUrl] and immediately emits

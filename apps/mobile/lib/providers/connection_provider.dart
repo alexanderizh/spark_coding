@@ -147,8 +147,10 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
       final deviceId = await _sessionService.generateDeviceId();
       AppLogger.info('Connection', 'deviceId 已生成: $deviceId');
 
-      if (_socketService.isConnected && state.serverUrl == serverUrl) {
-        AppLogger.info('Connection', '连接已存在，重发 mobile:join 校准会话');
+      if (_socketService.isConnected &&
+          state.serverUrl == serverUrl &&
+          _socketService.currentSessionId == sessionId) {
+        AppLogger.info('Connection', '连接已存在且 sessionId 相同，重发 mobile:join 校准会话');
         _socketService.rejoin(
           token: token,
           sessionId: sessionId,
