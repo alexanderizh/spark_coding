@@ -34,6 +34,7 @@ class _InputToolbarState extends State<InputToolbar> {
   bool _hasText = false;
   final List<({String command, String title, String desc})> _commands = const [
     (command: '/help', title: '帮助', desc: '查看可用命令'),
+    (command: '/cd', title: '切换目录', desc: '浏览并切换工作目录'),
     (command: '/clear', title: '清空上下文', desc: '清除当前会话上下文'),
     (command: '/compact', title: '压缩输出', desc: '减少冗余输出内容'),
     (command: '/status', title: '状态', desc: '查看当前会话与连接状态'),

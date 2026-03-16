@@ -13,6 +13,7 @@ import '../providers/session_provider.dart';
 import '../services/socket_service.dart';
 import '../utils/app_logger.dart';
 import '../widgets/connection_badge.dart';
+import '../widgets/file_browser.dart';
 import '../widgets/input_toolbar.dart';
 
 // ---------------------------------------------------------------------------
@@ -139,7 +140,28 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     socketService.sendRuntimeEnsure('claude');
   }
 
+  void _showFileBrowser() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => FileBrowser(
+        onSelected: (path) {
+          ref.read(socketServiceProvider).sendChdir(path);
+          Navigator.of(sheetContext).pop();
+          if (mounted) {
+            context.go(AppRoutes.home);
+          }
+        },
+      ),
+    );
+  }
+
   void _sendMessage(String text) {
+    if (text == '/cd') {
+      _showFileBrowser();
+      return;
+    }
     final socketService = ref.read(socketServiceProvider);
     socketService.sendInput('$text\r');
   }

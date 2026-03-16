@@ -1,6 +1,8 @@
 import { EventEmitter }   from 'events'
 import { execFileSync }   from 'child_process'
 import os                 from 'os'
+import fs                 from 'fs/promises'
+import path               from 'path'
 import * as pty           from 'node-pty'
 import { io, Socket }     from 'socket.io-client'
 import axios              from 'axios'
@@ -24,6 +26,10 @@ import {
   DesktopStatusReportPayload,
   DesktopStatusUpdatePayload,
   buildPairUrl,
+  FsListPayload,
+  FsListResultPayload,
+  TerminalChdirPayload,
+  FsEntry,
 } from '@spark_coder/shared'
 import {
   runHealthCheck,
@@ -442,6 +448,16 @@ export class TerminalBridge extends EventEmitter {
       try { this.ptyProcess?.resize(payload.cols, payload.rows) } catch { /* ignore */ }
     })
 
+    // FS List request
+    socket.on(Events.FS_LIST, (payload: FsListPayload) => {
+      this.handleFsList(payload)
+    })
+
+    // Change Directory request
+    socket.on(Events.TERMINAL_CHDIR, (payload: TerminalChdirPayload) => {
+      this.handleChdir(payload)
+    })
+
     socket.on(Events.RUNTIME_ENSURE, (payload: RuntimeEnsurePayload) => {
       this.log('收到 runtime:ensure cliType=%s socketConnected=%s', payload.cliType, socket.connected)
       if (payload.cliType !== CliTypes.CLAUDE) return
@@ -613,6 +629,130 @@ export class TerminalBridge extends EventEmitter {
     if (this.socket?.connected) {
       this.socket.emit(Events.RUNTIME_STATUS, payload)
       this.log('发送 runtime:status ready=%s', payload.ready)
+    }
+  }
+
+  // ── File System ──────────────────────────────────────────────────────────────
+
+  private async handleFsList(payload: FsListPayload): Promise<void> {
+    if (!this.config) return
+
+    let requestedPath = payload.path
+    if (!requestedPath) {
+      requestedPath = this.config.cwd
+    }
+
+    // Ensure path is absolute if possible, or relative to CWD?
+    // Usually requestedPath will be absolute from previous listing.
+    // If it's empty, use CWD.
+
+    this.log('收到 fs:list path=%s', requestedPath)
+
+    try {
+      const entries = await fs.readdir(requestedPath, { withFileTypes: true })
+      
+      const resultEntries: FsEntry[] = entries
+        .map(ent => ({
+          name: ent.name,
+          isDirectory: ent.isDirectory(),
+        }))
+        .sort((a, b) => {
+          // Directories first
+          if (a.isDirectory && !b.isDirectory) return -1
+          if (!a.isDirectory && b.isDirectory) return 1
+          return a.name.localeCompare(b.name)
+        })
+
+      const response: FsListResultPayload = {
+        sessionId: payload.sessionId,
+        path: requestedPath,
+        entries: resultEntries,
+      }
+      this.socket?.emit(Events.FS_LIST_RESULT, response)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      this.log('ERROR fs:list: %s', msg)
+      const response: FsListResultPayload = {
+        sessionId: payload.sessionId,
+        path: requestedPath,
+        entries: [],
+        error: msg,
+      }
+      this.socket?.emit(Events.FS_LIST_RESULT, response)
+    }
+  }
+
+  private async handleChdir(payload: TerminalChdirPayload): Promise<void> {
+    if (!this.config) return
+    const newPath = payload.path
+    this.log('收到 terminal:chdir path=%s', newPath)
+
+    try {
+      const stat = await fs.stat(newPath)
+      if (!stat.isDirectory()) {
+        throw new Error(`Not a directory: ${newPath}`)
+      }
+
+      this.config.cwd = newPath
+      
+      // Update config file? No, config is usually from arguments or environment. 
+      // But we should persist it if possible? 
+      // For now, just change runtime CWD.
+
+      const result = this.restartClaude()
+      if (result.ok) {
+        this.log('Claude restarted in new CWD: %s', newPath)
+        // Send a message to the terminal to inform the user
+        // We can inject it into the PTY output stream or just emit it directly
+        // Injecting into PTY ensures it shows up in history
+        // But wait, if we restarted, the PTY is fresh.
+        // We can just emit output.
+        // Also, we might want to let the user know.
+        
+        // Let's manually emit an output event to show success message
+        const msg = `\r\n\x1b[32m✔ Working directory changed to: ${newPath}\x1b[0m\r\n`
+        this.emitOutput(msg)
+        if (this.socket?.connected && this.sessionId) {
+            // Also send to socket for consistency? 
+            // emitOutput handles local display buffer and emits 'output' event which might be used by renderer?
+            // But we also need to send to mobile.
+            // batchOutput handles sending to mobile.
+            // So we should feed this into batchOutput or just call batchOutput directly?
+            // batchOutput expects data from PTY.
+            // Let's just use a direct emitOutput which updates local buffer and emits event.
+            // And also manually emit to socket if we want mobile to see it immediately.
+            // Actually, simply writing to the new PTY might be better if it supports echo.
+            // But we just restarted it.
+            
+            // Let's simulate output from the "system"
+            const outputPayload: TerminalOutputPayload = {
+                sessionId: this.sessionId,
+                data: msg,
+                timestamp: Date.now(),
+                seq: ++this.outputSeq,
+                snapshot: this.xtermSnapshot || this.snapshotBuffer
+            }
+            this.socket.emit(Events.TERMINAL_OUTPUT, outputPayload)
+        }
+      } else {
+        throw new Error(result.error || 'Failed to restart Claude')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      this.log('ERROR changing directory: %s', msg)
+      
+      const errorMsg = `\r\n\x1b[31m✖ Failed to change directory: ${msg}\x1b[0m\r\n`
+      this.emitOutput(errorMsg)
+       if (this.socket?.connected && this.sessionId) {
+            const outputPayload: TerminalOutputPayload = {
+                sessionId: this.sessionId,
+                data: errorMsg,
+                timestamp: Date.now(),
+                seq: ++this.outputSeq,
+                snapshot: this.xtermSnapshot || this.snapshotBuffer
+            }
+            this.socket.emit(Events.TERMINAL_OUTPUT, outputPayload)
+        }
     }
   }
 

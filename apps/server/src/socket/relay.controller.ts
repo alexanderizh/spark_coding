@@ -25,6 +25,9 @@ import {
   SessionResumePayload,
   SessionResumedPayload,
   DesktopStatusUpdatePayload,
+  FsListPayload,
+  FsListResultPayload,
+  TerminalChdirPayload,
 } from '@spark_coder/shared';
 
 const MAX_PAYLOAD_BYTES    = 64 * 1024;
@@ -538,6 +541,58 @@ export class RelayController {
       return;
     }
     this.ctx.to(meta.sessionId).emit(Events.RUNTIME_ENSURE, payload);
+  }
+
+  @OnWSMessage(Events.FS_LIST)
+  async onFsList(payload: FsListPayload) {
+    const meta = this.verifyRole('mobile');
+    if (!meta) return;
+    const session = await this.sessionService.findById(meta.sessionId);
+    if (!session || !session.agentSocketId) {
+      const response: FsListResultPayload = {
+        sessionId: meta.sessionId,
+        path: payload.path ?? '',
+        entries: [],
+        error: 'Agent is not connected',
+      };
+      this.ctx.emit(Events.FS_LIST_RESULT, response);
+      return;
+    }
+    const nextPayload: FsListPayload = {
+      sessionId: meta.sessionId,
+      path: payload.path,
+    };
+    this.log('info', '收到 fs:list sessionId=%s path=%s ->agent', meta.sessionId, payload.path ?? '');
+    this.ctx.to(meta.sessionId).emit(Events.FS_LIST, nextPayload);
+  }
+
+  @OnWSMessage(Events.TERMINAL_CHDIR)
+  async onTerminalChdir(payload: TerminalChdirPayload) {
+    const meta = this.verifyRole('mobile');
+    if (!meta) return;
+    const session = await this.sessionService.findById(meta.sessionId);
+    if (!session || !session.agentSocketId) {
+      this.sendError(SessionErrorCode.SESSION_NOT_FOUND, 'Agent is not connected');
+      return;
+    }
+    const nextPayload: TerminalChdirPayload = {
+      sessionId: meta.sessionId,
+      path: payload.path,
+    };
+    this.log('info', '收到 terminal:chdir sessionId=%s path=%s ->agent', meta.sessionId, payload.path);
+    this.ctx.to(meta.sessionId).emit(Events.TERMINAL_CHDIR, nextPayload);
+  }
+
+  @OnWSMessage(Events.FS_LIST_RESULT)
+  async onFsListResult(payload: FsListResultPayload) {
+    const meta = this.verifyRole('agent');
+    if (!meta) return;
+    const sessionId = payload.sessionId || meta.sessionId;
+    this.log('info', '收到 fs:list:result sessionId=%s entries=%s error=%s ->mobile', sessionId, payload.entries.length, payload.error ?? '');
+    this.ctx.to(sessionId).emit(Events.FS_LIST_RESULT, {
+      ...payload,
+      sessionId,
+    });
   }
 
   // ── Shared events ────────────────────────────────────────────────────────

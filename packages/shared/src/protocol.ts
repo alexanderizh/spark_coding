@@ -28,6 +28,8 @@ export const Events = {
 
   // Mobile → Server
   SESSION_RESUME:          'session:resume',          // Reconnect with existing token (no QR)
+  FS_LIST:                 'fs:list',                 // Mobile requests directory listing
+  TERMINAL_CHDIR:          'terminal:chdir',          // Mobile requests changing CWD
 
   // Either → Server
   SESSION_DELETE:   'session:delete',                // Client requests session deletion
@@ -39,6 +41,7 @@ export const Events = {
   SESSION_RESUMED:  'session:resumed',               // Server → client: resume confirmed
   SESSION_DELETED:  'session:deleted',               // Server → client: session was deleted
   TERMINAL_SNAPSHOT: 'terminal:snapshot',            // Server → Mobile: full-state snapshot
+  FS_LIST_RESULT:    'fs:list:result',               // Server → Mobile: directory listing result
 } as const;
 
 export type EventName = typeof Events[keyof typeof Events];
@@ -169,6 +172,28 @@ export interface RuntimeStatusPayload {
   started: boolean;
   message?: string;
   timestamp: number;
+}
+
+export interface FsEntry {
+  name: string;
+  isDirectory: boolean;
+}
+
+export interface FsListPayload {
+  sessionId: string;
+  path?: string;
+}
+
+export interface FsListResultPayload {
+  sessionId: string;
+  path: string;
+  entries: FsEntry[];
+  error?: string;
+}
+
+export interface TerminalChdirPayload {
+  sessionId: string;
+  path: string;
 }
 
 // ── QR pairing URL ───────────────────────────────────────────────────────────

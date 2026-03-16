@@ -6,6 +6,7 @@ const child_process = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const events = require("events");
+const fs$1 = require("fs/promises");
 const pty = require("node-pty");
 const socket_ioClient = require("socket.io-client");
 const axios = require("axios");
@@ -564,6 +565,12 @@ class TerminalBridge extends events.EventEmitter {
       } catch {
       }
     });
+    socket.on(shared.Events.FS_LIST, (payload) => {
+      this.handleFsList(payload);
+    });
+    socket.on(shared.Events.TERMINAL_CHDIR, (payload) => {
+      this.handleChdir(payload);
+    });
     socket.on(shared.Events.RUNTIME_ENSURE, (payload) => {
       this.log("收到 runtime:ensure cliType=%s socketConnected=%s", payload.cliType, socket.connected);
       if (payload.cliType !== shared.CliTypes.CLAUDE) return;
@@ -713,6 +720,91 @@ class TerminalBridge extends events.EventEmitter {
     if (this.socket?.connected) {
       this.socket.emit(shared.Events.RUNTIME_STATUS, payload);
       this.log("发送 runtime:status ready=%s", payload.ready);
+    }
+  }
+  // ── File System ──────────────────────────────────────────────────────────────
+  async handleFsList(payload) {
+    if (!this.config) return;
+    let requestedPath = payload.path;
+    if (!requestedPath) {
+      requestedPath = this.config.cwd;
+    }
+    this.log("收到 fs:list path=%s", requestedPath);
+    try {
+      const entries = await fs$1.readdir(requestedPath, { withFileTypes: true });
+      const resultEntries = entries.map((ent) => ({
+        name: ent.name,
+        isDirectory: ent.isDirectory()
+      })).sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      const response = {
+        sessionId: payload.sessionId,
+        path: requestedPath,
+        entries: resultEntries
+      };
+      this.socket?.emit(shared.Events.FS_LIST_RESULT, response);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log("ERROR fs:list: %s", msg);
+      const response = {
+        sessionId: payload.sessionId,
+        path: requestedPath,
+        entries: [],
+        error: msg
+      };
+      this.socket?.emit(shared.Events.FS_LIST_RESULT, response);
+    }
+  }
+  async handleChdir(payload) {
+    if (!this.config) return;
+    const newPath = payload.path;
+    this.log("收到 terminal:chdir path=%s", newPath);
+    try {
+      const stat = await fs$1.stat(newPath);
+      if (!stat.isDirectory()) {
+        throw new Error(`Not a directory: ${newPath}`);
+      }
+      this.config.cwd = newPath;
+      const result = this.restartClaude();
+      if (result.ok) {
+        this.log("Claude restarted in new CWD: %s", newPath);
+        const msg = `\r
+\x1B[32m✔ Working directory changed to: ${newPath}\x1B[0m\r
+`;
+        this.emitOutput(msg);
+        if (this.socket?.connected && this.sessionId) {
+          const outputPayload = {
+            sessionId: this.sessionId,
+            data: msg,
+            timestamp: Date.now(),
+            seq: ++this.outputSeq,
+            snapshot: this.xtermSnapshot || this.snapshotBuffer
+          };
+          this.socket.emit(shared.Events.TERMINAL_OUTPUT, outputPayload);
+        }
+      } else {
+        throw new Error(result.error || "Failed to restart Claude");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log("ERROR changing directory: %s", msg);
+      const errorMsg = `\r
+\x1B[31m✖ Failed to change directory: ${msg}\x1B[0m\r
+`;
+      this.emitOutput(errorMsg);
+      if (this.socket?.connected && this.sessionId) {
+        const outputPayload = {
+          sessionId: this.sessionId,
+          data: errorMsg,
+          timestamp: Date.now(),
+          seq: ++this.outputSeq,
+          snapshot: this.xtermSnapshot || this.snapshotBuffer
+        };
+        this.socket.emit(shared.Events.TERMINAL_OUTPUT, outputPayload);
+      }
     }
   }
   // ── Output batching (~60fps) ──────────────────────────────────────────────────

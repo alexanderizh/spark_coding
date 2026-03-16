@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../models/claude_prompt_model.dart';
+import '../models/fs_model.dart';
 import '../models/session_model.dart';
 import '../utils/app_logger.dart';
 
@@ -63,6 +64,7 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _sessionDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _fsListResultController = StreamController<FsListResult>.broadcast();
 
   // ---------------------------------------------------------------------------
   // Public streams
@@ -102,6 +104,8 @@ class SocketService {
   /// Fired when the session is deleted by either side.
   Stream<Map<String, dynamic>> get sessionDeleted =>
       _sessionDeletedController.stream;
+
+  Stream<FsListResult> get fsListResult => _fsListResultController.stream;
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -205,6 +209,24 @@ class SocketService {
     });
   }
 
+  void sendFsList([String? path]) {
+    if (!isConnected || _currentSessionId == null) return;
+    AppLogger.info('SocketService', '发送 fs:list path=$path');
+    _socket!.emit('fs:list', {
+      'sessionId': _currentSessionId,
+      'path': path,
+    });
+  }
+
+  void sendChdir(String path) {
+    if (!isConnected || _currentSessionId == null) return;
+    AppLogger.info('SocketService', '发送 terminal:chdir path=$path');
+    _socket!.emit('terminal:chdir', {
+      'sessionId': _currentSessionId,
+      'path': path,
+    });
+  }
+
   /// Gracefully closes the socket and cleans up all resources.
   Future<void> disconnect() async {
     _stopPing();
@@ -233,6 +255,7 @@ class SocketService {
     _connectionStatusController.close();
     _desktopStatusController.close();
     _sessionDeletedController.close();
+    _fsListResultController.close();
   }
 
   // ---------------------------------------------------------------------------
@@ -461,6 +484,19 @@ class SocketService {
         }
       } catch (e) {
         AppLogger.error('SocketService', '解析 session:deleted 失败', e);
+      }
+    });
+
+    // FS list result
+    socket.on('fs:list:result', (data) {
+      if (_socket != socket) return; // Stale socket — ignore
+      try {
+        final map = _toMap(data);
+        if (map != null) {
+          _fsListResultController.add(FsListResult.fromJson(map));
+        }
+      } catch (e) {
+        AppLogger.error('SocketService', '解析 fs:list:result 失败', e);
       }
     });
   }

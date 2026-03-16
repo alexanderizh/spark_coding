@@ -34,6 +34,7 @@ alwaysApply: false
 - **Docker 构建**：`apps/server/Dockerfile` 的 Node 版本需与本机一致（当前本机 v22，用 `node:22-alpine`）
 - **tsconfig 输出路径问题**：若 `apps/server/tsconfig.json` 的 `paths` 中引用了 `../../packages/shared/src`（TypeScript 源码），tsc 会把 shared 源文件纳入编译范围，导致 `rootDir` 被计算为 monorepo 根目录，编译产物错误地输出到 `dist/apps/server/src/bootstrap.js` 而非 `dist/bootstrap.js`。正确做法：删除 `paths` 别名（通过 `node_modules/@spark_coder/shared` 符号链接解析，shared 的 `package.json` 已配置 `main` 和 `types` 指向 `dist/`），并在 tsconfig 中显式添加 `"rootDir": "src"`
 - `@OnWSMessage` 只接收客户端发送的 payload，不接收 socket 参数；需通过 `@Inject('socket') ctx: Context` 获取当前连接，`Context` 即 socket 实例
+- 新增 socket 事件时必须在 `relay.controller.ts` 显式注册 `@OnWSMessage` 中继处理；仅在 shared 协议里声明事件不会自动转发，遗漏会导致客户端长时间 loading
 - `runtime:ensure`（mobile→agent）和 `runtime:status`（agent→mobile）需要做角色校验并按 `sessionId` 房间中继，agent 不在线时返回 `session:error`
 - 断连状态必须与角色一致：agent 断连写 `AGENT_DISCONNECTED`，mobile 断连写 `MOBILE_DISCONNECTED`，避免前后端状态误判
 - `mobile:join` 不应在 agent 未连接时直接报错中断；应允许进入 `WAITING_FOR_AGENT`，待 agent 注册后自动补发 `session:pair`
