@@ -31,7 +31,8 @@
       "Bash(grep:*)",
       "Bash(pnpm:*)",
       "Bash(flutter build:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(cat:*)"
     ]
   }
 }

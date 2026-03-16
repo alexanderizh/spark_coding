@@ -13,6 +13,9 @@
     <!-- Network state for detecting connectivity changes -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Install APK packages (required for in-app update) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Declare camera feature as optional so the app can be installed
          on devices without a camera (tablet kiosk mode, etc.) -->
     <uses-feature
@@ -62,6 +65,17 @@
                 <data android:scheme="sparkcoder" android:host="pair" />
             </intent-filter>
         </activity>
+
+        <!-- FileProvider for sharing APK file URI on Android 7+ -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- Don't delete the meta-data below. This is used by the Flutter
              tool to generate GeneratedPluginRegistrant.java -->

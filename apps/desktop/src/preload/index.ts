@@ -99,4 +99,20 @@ contextBridge.exposeInMainWorld('api', {
   reportXtermSnapshot: (snapshot: string): void => {
     ipcRenderer.send('xterm:snapshot', snapshot)
   },
+
+  // ── Auto-update ───────────────────────────────────────────────────────────
+  checkForUpdate: (): Promise<unknown> =>
+    ipcRenderer.invoke('update:check'),
+
+  downloadUpdate: (url: string): Promise<{ ok: boolean; filePath?: string }> =>
+    ipcRenderer.invoke('update:download', url),
+
+  installUpdate: (filePath: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('update:install', filePath),
+
+  onUpdateProgress: (cb: (v: { progress: number }) => void): Unsubscribe => {
+    const handler = (_: IpcRendererEvent, v: { progress: number }) => cb(v)
+    ipcRenderer.on('update:progress', handler)
+    return () => ipcRenderer.off('update:progress', handler)
+  },
 })

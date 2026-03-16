@@ -56,6 +56,14 @@ export class VersionService {
     return (result.affected ?? 0) > 0;
   }
 
+  async getLatest(platform: VersionPlatform): Promise<Version | null> {
+    return this.versionRepo
+      .createQueryBuilder('v')
+      .where('v.platform = :platform', { platform })
+      .orderBy('v.createdAt', 'DESC')
+      .getOne();
+  }
+
   async list(options: ListVersionsOptions): Promise<{ items: Version[]; total: number }> {
     const page = Math.max(1, options.page ?? 1);
     const limit = Math.min(100, Math.max(1, options.limit ?? 20));

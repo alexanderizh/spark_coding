@@ -183,7 +183,7 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
             child: Row(
               children: [
                 const Text(
@@ -223,8 +223,8 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(2),
+                      border: Border.all(color: const Color.fromARGB(255, 238, 238, 238)!),
                     ),
                     child: Text(
                       _currentPath ?? 'Loading...',
@@ -253,7 +253,7 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
             child: TextField(
               onChanged: (value) {
                 setState(() {
@@ -262,19 +262,19 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
               },
               decoration: InputDecoration(
                 hintText: '搜索当前页文件夹',
-                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIcon: const Icon(Icons.search, size: 18),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 10,
+                  horizontal: 2,
+                  vertical: 0,
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                  borderRadius: BorderRadius.circular(2),
+                  borderSide: const BorderSide(color: Color.fromARGB(255, 237, 237, 237)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                  borderRadius: BorderRadius.circular(2),
+                  borderSide: const BorderSide(color: Color.fromARGB(255, 237, 237, 237)),
                 ),
               ),
             ),

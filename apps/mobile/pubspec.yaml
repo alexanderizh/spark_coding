@@ -37,6 +37,15 @@ dependencies:
   # UUID generation
   uuid: ^4.3.3
 
+  # Auto-update: read current version
+  package_info_plus: ^8.0.0
+
+  # Auto-update: open APK installer
+  open_file_plus: ^3.4.1
+
+  # File system paths (temp dir for APK download)
+  path_provider: ^2.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

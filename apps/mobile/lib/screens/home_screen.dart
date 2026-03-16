@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../app/router.dart';
 import '../models/connection_link_model.dart';
@@ -11,7 +12,9 @@ import '../providers/connection_provider.dart';
 import '../providers/link_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/terminal_provider.dart';
+import '../providers/update_provider.dart';
 import '../utils/app_logger.dart';
+import '../widgets/update_notification.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -36,6 +39,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
         ref.read(linkNotifierProvider.notifier).refreshStatus();
       }
     });
+    // Trigger update check after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+  }
+
+  Future<void> _checkForUpdate() async {
+    final sessionService = ref.read(sessionServiceProvider);
+    final serverUrl = sessionService.serverUrl;
+    if (serverUrl == null || serverUrl.isEmpty) return;
+    final info = await PackageInfo.fromPlatform();
+    await ref
+        .read(updateProvider.notifier)
+        .checkForUpdate(serverUrl, info.version);
+    // After check, if update available show dialog (unless already dismissed)
+    if (!mounted) return;
+    final updateState = ref.read(updateProvider);
+    if (updateState.status == UpdateStatus.available &&
+        updateState.dismissedVersion != updateState.availableVersion) {
+      _showUpdateDialog(updateState);
+    }
+  }
+
+  void _showUpdateDialog(UpdateState updateState) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('发现新版本 ${updateState.availableVersion}'),
+        content: updateState.releaseNotes != null && updateState.releaseNotes!.isNotEmpty
+            ? Text(updateState.releaseNotes!)
+            : const Text('有新版本可供下载，建议立即更新。'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(updateProvider.notifier).dismissUpdate();
+            },
+            child: const Text('暂不更新'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(updateProvider.notifier).startDownload();
+            },
+            child: const Text('立即下载'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -115,7 +165,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           SystemNavigator.pop();
         }
       },
-      child: Scaffold(
+      child: Stack(
+        children: [
+        Scaffold(
         appBar: AppBar(
           title: const Text('连接管理'),
           actions: [
@@ -180,6 +232,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                   ),
                 ),
         ),
+        ),
+        const UpdateNotificationWidget(),
+        ],
       ),
     );
   }

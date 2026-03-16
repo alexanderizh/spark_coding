@@ -4,6 +4,7 @@ import logoIcon from './assets/logo.png'
 import { SessionPage } from './pages/Session'
 import { SettingsPage } from './pages/Settings'
 import { ConnectionsPage } from './pages/Connections'
+import { UpdateNotification } from './components/UpdateNotification'
 
 type Page = 'pairing' | 'session' | 'connections' | 'settings'
 
@@ -47,6 +48,8 @@ export default function App(): React.ReactElement {
         {page === 'connections' && <ConnectionsPage />}
         {page === 'settings'    && <SettingsPage />}
       </main>
+
+      <UpdateNotification />
     </div>
   )
 }

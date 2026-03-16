@@ -51,5 +51,14 @@ electron.contextBridge.exposeInMainWorld("api", {
   },
   reportXtermSnapshot: (snapshot) => {
     electron.ipcRenderer.send("xterm:snapshot", snapshot);
+  },
+  // ── Auto-update ───────────────────────────────────────────────────────────
+  checkForUpdate: () => electron.ipcRenderer.invoke("update:check"),
+  downloadUpdate: (url) => electron.ipcRenderer.invoke("update:download", url),
+  installUpdate: (filePath) => electron.ipcRenderer.invoke("update:install", filePath),
+  onUpdateProgress: (cb) => {
+    const handler = (_, v) => cb(v);
+    electron.ipcRenderer.on("update:progress", handler);
+    return () => electron.ipcRenderer.off("update:progress", handler);
   }
 });

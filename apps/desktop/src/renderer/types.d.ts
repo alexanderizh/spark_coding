@@ -38,6 +38,13 @@ export interface DesktopStatusReport {
   reportedAt:     number
 }
 
+export interface UpdateCheckResult {
+  hasUpdate: boolean
+  version?: string
+  downloadUrl?: string
+  releaseNotes?: string | null
+}
+
 export interface PairedSessionRecord {
   sessionId:       string
   serverUrl:       string
@@ -88,6 +95,12 @@ declare global {
       onOutput:        (cb: (data: string) => void)           => () => void
       onClaudeExit:    (cb: (code: number) => void)           => () => void
       onDesktopStatus: (cb: (v: DesktopStatusReport) => void) => () => void
+
+      // Auto-update
+      checkForUpdate:   () => Promise<UpdateCheckResult>
+      downloadUpdate:   (url: string) => Promise<{ ok: boolean; filePath?: string }>
+      installUpdate:    (filePath: string) => Promise<{ ok: boolean }>
+      onUpdateProgress: (cb: (v: { progress: number }) => void) => () => void
     }
   }
 }

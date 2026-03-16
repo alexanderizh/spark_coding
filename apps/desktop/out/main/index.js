@@ -5,6 +5,8 @@ const path = require("path");
 const child_process = require("child_process");
 const fs = require("fs");
 const os = require("os");
+const https = require("https");
+const http = require("http");
 const events = require("events");
 const fs$1 = require("fs/promises");
 const pty = require("node-pty");
@@ -28,6 +30,10 @@ function _interopNamespaceDefault(e) {
   n.default = e;
   return Object.freeze(n);
 }
+const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
+const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
+const https__namespace = /* @__PURE__ */ _interopNamespaceDefault(https);
+const http__namespace = /* @__PURE__ */ _interopNamespaceDefault(http);
 const pty__namespace = /* @__PURE__ */ _interopNamespaceDefault(pty);
 let mainWindow = null;
 let isQuitting = false;
@@ -1164,6 +1170,82 @@ function setupIpc(getWindow) {
   });
   electron.ipcMain.on("xterm:snapshot", (_e, snapshot) => {
     bridge?.setXtermSnapshot(snapshot);
+  });
+  electron.ipcMain.handle("update:check", async () => {
+    const serverUrl = getEffectiveServerUrl();
+    if (!serverUrl) return { hasUpdate: false };
+    const platform = process.platform === "darwin" ? "macos" : "windows";
+    try {
+      const current = getAppVersion();
+      const resp = await fetch(`${serverUrl}/api/version/latest?platform=${platform}`);
+      if (!resp.ok) return { hasUpdate: false };
+      const body = await resp.json();
+      if (!body.success || !body.data) return { hasUpdate: false };
+      const { version: remote, downloadUrl, releaseNotes } = body.data;
+      if (!isNewer(remote, current)) return { hasUpdate: false };
+      return { hasUpdate: true, version: remote, downloadUrl, releaseNotes: releaseNotes ?? null };
+    } catch (_) {
+      return { hasUpdate: false };
+    }
+  });
+  electron.ipcMain.handle("update:download", async (_e, url) => {
+    try {
+      const filePath = await downloadUpdate(url, getWindow);
+      return { ok: true, filePath };
+    } catch (_) {
+      return { ok: false };
+    }
+  });
+  electron.ipcMain.handle("update:install", async (_e, filePath) => {
+    try {
+      await electron.shell.openPath(filePath);
+      return { ok: true };
+    } catch (_) {
+      return { ok: false };
+    }
+  });
+}
+function isNewer(remote, current) {
+  const rParts = remote.split(".").map(Number);
+  const cParts = current.split(".").map(Number);
+  const len = Math.max(rParts.length, cParts.length);
+  for (let i = 0; i < len; i++) {
+    const r = rParts[i] ?? 0;
+    const c = cParts[i] ?? 0;
+    if (r > c) return true;
+    if (r < c) return false;
+  }
+  return false;
+}
+function downloadUpdate(url, getWindow) {
+  return new Promise((resolve, reject) => {
+    const ext = process.platform === "darwin" ? "dmg" : "exe";
+    const destPath = path__namespace.join(electron.app.getPath("temp"), `spark_coder_update.${ext}`);
+    const file = fs__namespace.createWriteStream(destPath);
+    const protocol = url.startsWith("https") ? https__namespace : http__namespace;
+    protocol.get(url, (res) => {
+      const total = parseInt(res.headers["content-length"] ?? "0", 10);
+      let received = 0;
+      res.on("data", (chunk) => {
+        received += chunk.length;
+        if (total > 0) {
+          const progress = received / total;
+          const win = getWindow();
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("update:progress", { progress });
+          }
+        }
+      });
+      res.pipe(file);
+      file.on("finish", () => {
+        file.close();
+        resolve(destPath);
+      });
+    }).on("error", (err) => {
+      fs__namespace.unlink(destPath, () => {
+      });
+      reject(err);
+    });
   });
 }
 async function fetchDesktopSessionsFromServer(serverUrl, desktopDeviceId) {

@@ -4,7 +4,9 @@ import { Application } from '@midwayjs/socketio';
 import { SessionService } from '../service/session.service';
 import { DeviceService } from '../service/device.service';
 import { QrService } from '../service/qr.service';
+import { VersionService } from '../service/version.service';
 import { SessionErrorCode, Events, SessionDeletedPayload } from '@spark_coder/shared';
+import type { VersionPlatform } from '../entity/version.entity';
 
 @Controller('/api')
 export class SessionController {
@@ -22,6 +24,26 @@ export class SessionController {
 
   @Inject()
   qrService: QrService;
+
+  @Inject()
+  versionService: VersionService;
+
+  /** Public endpoint — no auth required. Returns the latest version for a given platform. */
+  @Get('/version/latest')
+  async getLatestVersion(@Query('platform') platform: string) {
+    const validPlatforms = ['android', 'macos', 'windows'];
+    if (!platform || !validPlatforms.includes(platform)) {
+      this.ctx.status = 400;
+      return { success: false, error: 'platform query param required (android|macos|windows)' };
+    }
+    const version = await this.versionService.getLatest(platform as VersionPlatform);
+    return {
+      success: true,
+      data: version
+        ? { version: version.version, downloadUrl: version.downloadUrl, releaseNotes: version.releaseNotes ?? null }
+        : null,
+    };
+  }
 
   /**
    * Create a new session (called by Desktop on startup).
