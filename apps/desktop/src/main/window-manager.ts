@@ -17,13 +17,13 @@ export function setQuitting(v: boolean): void {
   isQuitting = v
 }
 
-export function createMainWindow(): BrowserWindow {
+export function createMainWindow(appName: string): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1060,
     height: 720,
     minWidth: 720,
     minHeight: 500,
-    title: 'Spark Coder',
+    title: appName,
     icon: getWindowIcon(),
     backgroundColor: '#ffffff',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',

@@ -69,6 +69,7 @@ declare global {
       // Paired sessions
       listPairedSessions: () => Promise<PairedSessionRecord[]>
       deleteSession: (sessionId: string, serverUrl: string) => Promise<{ ok: boolean }>
+      deleteSessions: (sessions: Array<{ sessionId: string; serverUrl: string }>) => Promise<{ ok: boolean; failed: number }>
 
       // Session
       startSession:    () => Promise<{ ok?: boolean; error?: string }>

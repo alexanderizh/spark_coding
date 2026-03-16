@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld('api', {
   deleteSession: (sessionId: string, serverUrl: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('session:delete', sessionId, serverUrl),
 
+  deleteSessions: (sessions: Array<{ sessionId: string; serverUrl: string }>): Promise<{ ok: boolean; failed: number }> =>
+    ipcRenderer.invoke('session:deleteBatch', sessions),
+
   // ── Session ───────────────────────────────────────────────────────────────────
   startSession: (): Promise<unknown> =>
     ipcRenderer.invoke('session:start'),

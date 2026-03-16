@@ -40,13 +40,13 @@ function getWindowIcon() {
 function setQuitting(v) {
   isQuitting = v;
 }
-function createMainWindow() {
+function createMainWindow(appName2) {
   mainWindow = new electron.BrowserWindow({
     width: 1060,
     height: 720,
     minWidth: 720,
     minHeight: 500,
-    title: "Spark Coder",
+    title: appName2,
     icon: getWindowIcon(),
     backgroundColor: "#ffffff",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
@@ -84,7 +84,7 @@ function showMainWindow() {
   mainWindow.focus();
 }
 let tray = null;
-function createTray() {
+function createTray(appName2) {
   const iconPath2 = path.join(__dirname, "../../resources/tray-icon.png");
   let icon;
   try {
@@ -100,10 +100,10 @@ function createTray() {
     icon = electron.nativeImage.createEmpty();
   }
   tray = new electron.Tray(icon);
-  tray.setToolTip("Spark Coder");
+  tray.setToolTip(appName2);
   const menu = electron.Menu.buildFromTemplate([
     {
-      label: "Open Spark Coder",
+      label: `Open ${appName2}`,
       click: () => showMainWindow()
     },
     { type: "separator" },
@@ -1255,9 +1255,13 @@ if (!gotLock) {
     showMainWindow();
   });
 }
+const appName = electron.app.isPackaged ? "Spark Coder" : "Spark Coder Dev";
+if (!electron.app.isPackaged) {
+  electron.app.setName(appName);
+}
 electron.app.whenReady().then(async () => {
-  const win = createMainWindow();
-  createTray();
+  const win = createMainWindow(appName);
+  createTray(appName);
   setupIpc(() => getMainWindow());
   win.webContents.once("did-finish-load", async () => {
     await maybeAutoStart(() => getMainWindow());

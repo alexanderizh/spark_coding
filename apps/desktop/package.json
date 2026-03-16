@@ -1,6 +1,6 @@
 {
   "name": "@spark_coder/desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Spark Coder Desktop — control Claude from your mobile, no CLI needed",
   "main": "out/main/index.js",
   "scripts": {

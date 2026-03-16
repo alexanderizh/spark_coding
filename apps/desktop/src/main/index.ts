@@ -77,10 +77,16 @@ if (!gotLock) {
   })
 }
 
-app.whenReady().then(async () => {
-  const win = createMainWindow()
+// 开发模式下修改应用名称
+const appName = app.isPackaged ? 'Spark Coder' : 'Spark Coder Dev'
+if (!app.isPackaged) {
+  app.setName(appName)
+}
 
-  createTray()
+app.whenReady().then(async () => {
+  const win = createMainWindow(appName)
+
+  createTray(appName)
   setupIpc(() => getMainWindow())
 
   // Auto-start session once renderer has loaded

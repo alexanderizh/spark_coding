@@ -113,23 +113,56 @@ function IdChip({ label, value, platform }: { label: string; value: string; plat
   )
 }
 
-function ConnectionCard({ record, onDelete }: { record: PairedSessionRecord; onDelete: () => void }) {
+function ConnectionCard({
+  record,
+  onDelete,
+  selectMode,
+  selected,
+  onToggleSelect,
+}: {
+  record: PairedSessionRecord
+  onDelete: () => void
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect: () => void
+}) {
   return (
     <div
       style={{
         background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
+        border: selected ? '2px solid var(--accent)' : '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         padding: '18px 20px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
+        cursor: selectMode ? 'pointer' : 'default',
       }}
+      onClick={selectMode ? onToggleSelect : undefined}
     >
-      {/* Top row: hostname + launch type + last used */}
+      {/* Top row: checkbox + hostname + launch type + last used */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {selectMode && (
+            <div
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 4,
+                border: selected ? 'none' : '1.5px solid var(--text-muted)',
+                background: selected ? 'var(--accent)' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {selected && (
+                <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>
+              )}
+            </div>
+          )}
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
             {record.hostname ?? '未知主机'}
           </span>
@@ -179,13 +212,15 @@ function ConnectionCard({ record, onDelete }: { record: PairedSessionRecord; onD
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             配对于 {new Date(record.pairedAt).toLocaleDateString('zh-CN')}
           </span>
-          <button
-            onClick={onDelete}
-            className="btn btn--danger"
-            style={{ padding: '2px 10px', fontSize: 11, fontWeight: 500 }}
-          >
-            删除
-          </button>
+          {!selectMode && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="btn btn--danger"
+              style={{ padding: '2px 10px', fontSize: 11, fontWeight: 500 }}
+            >
+              删除
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -195,6 +230,9 @@ function ConnectionCard({ record, onDelete }: { record: PairedSessionRecord; onD
 export function ConnectionsPage(): React.ReactElement {
   const [sessions, setSessions] = useState<PairedSessionRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -210,16 +248,89 @@ export function ConnectionsPage(): React.ReactElement {
     load()
   }, [load])
 
+  const toggleSelect = useCallback((sessionId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(sessionId)) {
+        next.delete(sessionId)
+      } else {
+        next.add(sessionId)
+      }
+      return next
+    })
+  }, [])
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(sessions.map(s => s.sessionId)))
+  }, [sessions])
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+  }, [])
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }, [])
+
+  const handleBatchDelete = useCallback(async () => {
+    const selectedSessions = sessions.filter(s => selectedIds.has(s.sessionId))
+    if (selectedSessions.length === 0) return
+    if (!confirm(`确定要删除选中的 ${selectedSessions.length} 条配对记录吗？\n所有选中的配对信息都将被清除。`)) return
+
+    setDeleting(true)
+    try {
+      await window.api.deleteSessions(selectedSessions.map(s => ({ sessionId: s.sessionId, serverUrl: s.serverUrl })))
+      exitSelectMode()
+      load()
+    } finally {
+      setDeleting(false)
+    }
+  }, [sessions, selectedIds, exitSelectMode, load])
+
   useEffect(() => { load() }, [load])
 
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 className="page-title" style={{ marginBottom: 0 }}>连接记录</h2>
-        <button className="btn btn--ghost" onClick={load} style={{ fontSize: 13 }}>
-          刷新
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {sessions.length > 0 && !selectMode && (
+            <button className="btn btn--ghost" onClick={() => setSelectMode(true)} style={{ fontSize: 13 }}>
+              批量管理
+            </button>
+          )}
+          <button className="btn btn--ghost" onClick={load} style={{ fontSize: 13 }}>
+            刷新
+          </button>
+        </div>
       </div>
+
+      {selectMode && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 'var(--radius)' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            已选 {selectedIds.size} 项
+          </span>
+          <button className="btn btn--ghost" onClick={selectAll} style={{ fontSize: 12, padding: '4px 10px' }}>
+            全选
+          </button>
+          <button className="btn btn--ghost" onClick={clearSelection} style={{ fontSize: 12, padding: '4px 10px' }}>
+            取消全选
+          </button>
+          <div style={{ flex: 1 }} />
+          <button
+            className="btn btn--danger"
+            onClick={handleBatchDelete}
+            disabled={selectedIds.size === 0 || deleting}
+            style={{ fontSize: 12, padding: '4px 12px', opacity: selectedIds.size === 0 ? 0.5 : 1 }}
+          >
+            {deleting ? '删除中…' : `删除选中 (${selectedIds.size})`}
+          </button>
+          <button className="btn btn--ghost" onClick={exitSelectMode} style={{ fontSize: 12, padding: '4px 10px' }}>
+            取消
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载中…</p>
@@ -239,7 +350,14 @@ export function ConnectionsPage(): React.ReactElement {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {sessions.map((s) => (
-            <ConnectionCard key={s.sessionId} record={s} onDelete={() => handleDelete(s)} />
+            <ConnectionCard
+              key={s.sessionId}
+              record={s}
+              onDelete={() => handleDelete(s)}
+              selectMode={selectMode}
+              selected={selectedIds.has(s.sessionId)}
+              onToggleSelect={() => toggleSelect(s.sessionId)}
+            />
           ))}
         </div>
       )}

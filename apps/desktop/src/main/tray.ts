@@ -4,7 +4,7 @@ import { showMainWindow, setQuitting } from './window-manager'
 
 let tray: Tray | null = null
 
-export function createTray(): void {
+export function createTray(appName: string): void {
   const iconPath = join(__dirname, '../../resources/tray-icon.png')
   let icon: Electron.NativeImage
   try {
@@ -23,11 +23,11 @@ export function createTray(): void {
   }
 
   tray = new Tray(icon)
-  tray.setToolTip('Spark Coder')
+  tray.setToolTip(appName)
 
   const menu = Menu.buildFromTemplate([
     {
-      label: 'Open Spark Coder',
+      label: `Open ${appName}`,
       click: () => showMainWindow(),
     },
     { type: 'separator' },

@@ -54,6 +54,16 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
     return { ok: true }
   })
 
+  ipcMain.handle('session:deleteBatch', async (_e, sessions: Array<{ sessionId: string; serverUrl: string }>) => {
+    const results = await Promise.allSettled(
+      sessions.map(({ sessionId, serverUrl }) =>
+        fetch(`${serverUrl}/api/session/${sessionId}`, { method: 'DELETE' }).catch(() => null)
+      )
+    )
+    const failed = results.filter(r => r.status === 'rejected').length
+    return { ok: true, failed }
+  })
+
   // ── Settings ─────────────────────────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings())
 

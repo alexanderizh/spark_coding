@@ -30,7 +30,8 @@
       "WebFetch(domain:api.github.com)",
       "Bash(grep:*)",
       "Bash(pnpm:*)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Bash(git add:*)"
     ]
   }
 }
