@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -62,27 +60,7 @@ class SessionService {
       await prefs.setString(_Keys.deviceId, _deviceId!);
     }
 
-    // Restore persisted links
-    final linksJson = prefs.getString(_Keys.links);
-    if (linksJson != null && linksJson.isNotEmpty) {
-      try {
-        final list = jsonDecode(linksJson) as List<dynamic>;
-        for (final item in list) {
-          if (item is Map<String, dynamic>) {
-            _links.add(ConnectionLink.fromJson(item));
-          }
-        }
-      } catch (_) {
-        // Corrupted data — start fresh
-      }
-    }
-    _activeLinkId = prefs.getString(_Keys.activeLinkId);
-
-    // Migrate: remove legacy single-session keys
-    await Future.wait([
-      prefs.remove(_Keys.token),
-      prefs.remove(_Keys.sessionId),
-    ]);
+    await _persistLinks(prefs);
   }
 
   // ---------------------------------------------------------------------------
@@ -321,15 +299,8 @@ class SessionService {
     final storage = prefs ?? await SharedPreferences.getInstance();
     final targetServerUrl = activeLink?.serverUrl ?? _lastServerUrl;
     await Future.wait([
-      _links.isEmpty
-          ? storage.remove(_Keys.links)
-          : storage.setString(
-              _Keys.links,
-              jsonEncode(_links.map((l) => l.toJson()).toList()),
-            ),
-      _activeLinkId == null
-          ? storage.remove(_Keys.activeLinkId)
-          : storage.setString(_Keys.activeLinkId, _activeLinkId!),
+      storage.remove(_Keys.links),
+      storage.remove(_Keys.activeLinkId),
       storage.remove(_Keys.token),
       storage.remove(_Keys.sessionId),
       targetServerUrl == null
