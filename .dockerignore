@@ -7,7 +7,7 @@ apps/terminal/dist/
 node_modules/
 apps/desktop/
 apps/mobile/
-apps/admin/
+apps/admin/dist/
 docker-build/
 outputs/
 

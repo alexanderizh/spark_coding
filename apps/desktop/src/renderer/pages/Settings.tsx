@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import type { AppSettings } from '../types.d'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import type { AppSettings, UpdateCheckResult } from '../types.d'
 
 export function SettingsPage(): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings>({
@@ -13,6 +13,14 @@ export function SettingsPage(): React.ReactElement {
   const [deviceId, setDeviceId] = useState<string>('')
   const [appVersion, setAppVersion] = useState<string>('')
   const [effectiveServerUrl, setEffectiveServerUrl] = useState<{ url: string; source: 'settings' | 'env'; envVar: string } | null>(null)
+
+  // Update check state
+  type UpdatePhase = 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error'
+  const [updatePhase, setUpdatePhase] = useState<UpdatePhase>('idle')
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null)
+  const [downloadProgress, setDownloadProgress] = useState(0)
+  const [downloadedPath, setDownloadedPath] = useState<string | undefined>()
+  const unsubProgressRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     window.api.getSettings().then(setSettings)
@@ -50,6 +58,42 @@ export function SettingsPage(): React.ReactElement {
   const handleQuitApp = useCallback(() => {
     window.api.quitApp()
   }, [])
+
+  const handleCheckUpdate = useCallback(async () => {
+    setUpdatePhase('checking')
+    setUpdateResult(null)
+    const res = await window.api.checkForUpdate()
+    if (!res.hasUpdate) {
+      setUpdatePhase('up-to-date')
+      return
+    }
+    setUpdateResult(res)
+    setUpdatePhase('available')
+  }, [])
+
+  const handleDownloadUpdate = useCallback(async () => {
+    if (!updateResult?.downloadUrl) return
+    setUpdatePhase('downloading')
+    setDownloadProgress(0)
+    unsubProgressRef.current?.()
+    unsubProgressRef.current = window.api.onUpdateProgress(({ progress }) => {
+      setDownloadProgress(progress)
+    })
+    const res = await window.api.downloadUpdate(updateResult.downloadUrl)
+    unsubProgressRef.current?.()
+    unsubProgressRef.current = null
+    if (res.ok && res.filePath) {
+      setDownloadedPath(res.filePath)
+      setUpdatePhase('downloaded')
+    } else {
+      setUpdatePhase('error')
+    }
+  }, [updateResult])
+
+  const handleInstallUpdate = useCallback(async () => {
+    if (!downloadedPath) return
+    await window.api.installUpdate(downloadedPath)
+  }, [downloadedPath])
 
   return (
     <>
@@ -188,6 +232,83 @@ export function SettingsPage(): React.ReactElement {
         <div className="form-hint" style={{ marginTop: 8 }}>
           安装新版本前可先关闭后台程序；若需快速恢复可使用重启。
         </div>
+      </div>
+
+      {/* Update section */}
+      <div style={{ marginTop: 16, padding: '14px 20px', background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+          版本更新
+        </div>
+
+        {/* Check / status row */}
+        {(updatePhase === 'idle' || updatePhase === 'up-to-date' || updatePhase === 'error') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn--ghost" onClick={handleCheckUpdate} style={{ fontSize: 13 }}>
+              检测更新
+            </button>
+            {updatePhase === 'up-to-date' && (
+              <span style={{ fontSize: 13, color: 'var(--success)' }}>✓ 已是最新版本</span>
+            )}
+            {updatePhase === 'error' && (
+              <span style={{ fontSize: 13, color: 'var(--error)' }}>检测失败，请重试</span>
+            )}
+          </div>
+        )}
+
+        {updatePhase === 'checking' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)', fontSize: 13 }}>
+            <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            检测中…
+          </div>
+        )}
+
+        {updatePhase === 'available' && updateResult && (
+          <div>
+            <div style={{ fontSize: 13, marginBottom: 8 }}>
+              发现新版本 <strong>{updateResult.version}</strong>
+              {updateResult.releaseNotes && (
+                <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontSize: 12 }}>{updateResult.releaseNotes}</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn--primary" onClick={handleDownloadUpdate} style={{ fontSize: 13 }}>
+                立即下载
+              </button>
+              <button className="btn btn--ghost" onClick={() => setUpdatePhase('idle')} style={{ fontSize: 13 }}>
+                暂不更新
+              </button>
+            </div>
+          </div>
+        )}
+
+        {updatePhase === 'downloading' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
+              <span>下载中…</span>
+              <span>{Math.round(downloadProgress * 100)}%</span>
+            </div>
+            <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round(downloadProgress * 100)}%`, background: 'var(--accent)', transition: 'width 0.2s ease' }} />
+            </div>
+          </div>
+        )}
+
+        {updatePhase === 'downloaded' && (
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--success)', marginBottom: 8 }}>✓ 下载完成</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn--primary" onClick={handleInstallUpdate} style={{ fontSize: 13 }}>
+                安装更新
+              </button>
+              <button className="btn btn--ghost" onClick={() => downloadedPath && window.api.showUpdateInFolder(downloadedPath)} style={{ fontSize: 13 }}>
+                打开文件夹
+              </button>
+              <button className="btn btn--ghost" onClick={() => setUpdatePhase('idle')} style={{ fontSize: 13 }}>
+                稍后
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Help section */}

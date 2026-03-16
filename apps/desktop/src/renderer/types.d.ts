@@ -99,8 +99,9 @@ declare global {
       // Auto-update
       checkForUpdate:   () => Promise<UpdateCheckResult>
       downloadUpdate:   (url: string) => Promise<{ ok: boolean; filePath?: string }>
-      installUpdate:    (filePath: string) => Promise<{ ok: boolean }>
-      onUpdateProgress: (cb: (v: { progress: number }) => void) => () => void
+      installUpdate:      (filePath: string) => Promise<{ ok: boolean }>
+      showUpdateInFolder: (filePath: string) => Promise<{ ok: boolean }>
+      onUpdateProgress:   (cb: (v: { progress: number }) => void) => () => void
     }
   }
 }

@@ -286,6 +286,8 @@
 /* ── Reset ─────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ── Tokens（黑白灰主题，参考 mobile）──────────────────────────────────────── */
 :root {
   --bg-app:        #ffffff;

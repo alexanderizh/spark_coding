@@ -17713,11 +17713,19 @@ function SettingsPage() {
   const [detecting, setDetecting] = reactExports.useState(false);
   const [deviceId, setDeviceId] = reactExports.useState("");
   const [appVersion, setAppVersion] = reactExports.useState("");
+  const [effectiveServerUrl, setEffectiveServerUrl] = reactExports.useState(null);
+  const [updatePhase, setUpdatePhase] = reactExports.useState("idle");
+  const [updateResult, setUpdateResult] = reactExports.useState(null);
+  const [downloadProgress, setDownloadProgress] = reactExports.useState(0);
+  const [downloadedPath, setDownloadedPath] = reactExports.useState();
+  const unsubProgressRef = reactExports.useRef(null);
   reactExports.useEffect(() => {
     window.api.getSettings().then(setSettings);
     window.api.getDeviceId().then(setDeviceId).catch(() => {
     });
     window.api.getAppVersion().then(setAppVersion).catch(() => {
+    });
+    window.api.getEffectiveServerUrl().then(setEffectiveServerUrl).catch(() => {
     });
   }, []);
   const handleChange = reactExports.useCallback((key, value) => {
@@ -17745,6 +17753,39 @@ function SettingsPage() {
   const handleQuitApp = reactExports.useCallback(() => {
     window.api.quitApp();
   }, []);
+  const handleCheckUpdate = reactExports.useCallback(async () => {
+    setUpdatePhase("checking");
+    setUpdateResult(null);
+    const res = await window.api.checkForUpdate();
+    if (!res.hasUpdate) {
+      setUpdatePhase("up-to-date");
+      return;
+    }
+    setUpdateResult(res);
+    setUpdatePhase("available");
+  }, []);
+  const handleDownloadUpdate = reactExports.useCallback(async () => {
+    if (!updateResult?.downloadUrl) return;
+    setUpdatePhase("downloading");
+    setDownloadProgress(0);
+    unsubProgressRef.current?.();
+    unsubProgressRef.current = window.api.onUpdateProgress(({ progress }) => {
+      setDownloadProgress(progress);
+    });
+    const res = await window.api.downloadUpdate(updateResult.downloadUrl);
+    unsubProgressRef.current?.();
+    unsubProgressRef.current = null;
+    if (res.ok && res.filePath) {
+      setDownloadedPath(res.filePath);
+      setUpdatePhase("downloaded");
+    } else {
+      setUpdatePhase("error");
+    }
+  }, [updateResult]);
+  const handleInstallUpdate = reactExports.useCallback(async () => {
+    if (!downloadedPath) return;
+    await window.api.installUpdate(downloadedPath);
+  }, [downloadedPath]);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "page-title", children: "设置" }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
@@ -17760,7 +17801,16 @@ function SettingsPage() {
             onChange: (e) => handleChange("serverUrl", e.target.value)
           }
         ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "form-hint", children: "中继服务器 API 地址，用于与手机端建立连接。需与 server 应用启动的地址一致。留空则使用环境变量 RELAY_SERVER_URL" })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "form-hint", children: "中继服务器 API 地址，用于与手机端建立连接。需与 server 应用启动的地址一致。留空则使用环境变量 RELAY_SERVER_URL" }),
+        effectiveServerUrl?.url && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 8, padding: "8px 12px", background: "var(--bg-secondary)", borderRadius: "var(--radius)", fontSize: 12 }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: "var(--text-secondary)" }, children: "当前使用中: " }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("code", { style: { fontFamily: "monospace", color: "var(--accent)" }, children: effectiveServerUrl.url }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: "var(--text-muted)", marginLeft: 8 }, children: [
+            "(",
+            effectiveServerUrl.source === "settings" ? "来自设置" : `来自环境变量 ${effectiveServerUrl.envVar}`,
+            ")"
+          ] })
+        ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-group", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "form-label", children: "Claude CLI 路径" }),
@@ -17845,6 +17895,47 @@ function SettingsPage() {
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--danger", onClick: handleQuitApp, children: "关闭后台程序" })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "form-hint", style: { marginTop: 8 }, children: "安装新版本前可先关闭后台程序；若需快速恢复可使用重启。" })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 16, padding: "14px 20px", background: "var(--bg-card)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontWeight: 600, color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }, children: "版本更新" }),
+      (updatePhase === "idle" || updatePhase === "up-to-date" || updatePhase === "error") && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 12 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: handleCheckUpdate, style: { fontSize: 13 }, children: "检测更新" }),
+        updatePhase === "up-to-date" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 13, color: "var(--success)" }, children: "✓ 已是最新版本" }),
+        updatePhase === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 13, color: "var(--error)" }, children: "检测失败，请重试" })
+      ] }),
+      updatePhase === "checking" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 10, color: "var(--text-muted)", fontSize: 13 }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { display: "inline-block", width: 14, height: 14, border: "2px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" } }),
+        "检测中…"
+      ] }),
+      updatePhase === "available" && updateResult && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: 13, marginBottom: 8 }, children: [
+          "发现新版本 ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: updateResult.version }),
+          updateResult.releaseNotes && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { marginLeft: 8, color: "var(--text-muted)", fontSize: 12 }, children: updateResult.releaseNotes })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8 }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--primary", onClick: handleDownloadUpdate, style: { fontSize: 13 }, children: "立即下载" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: () => setUpdatePhase("idle"), style: { fontSize: 13 }, children: "暂不更新" })
+        ] })
+      ] }),
+      updatePhase === "downloading" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13, color: "var(--text-secondary)" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "下载中…" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+            Math.round(downloadProgress * 100),
+            "%"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden" }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: "100%", width: `${Math.round(downloadProgress * 100)}%`, background: "var(--accent)", transition: "width 0.2s ease" } }) })
+      ] }),
+      updatePhase === "downloaded" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: 13, color: "var(--success)", marginBottom: 8 }, children: "✓ 下载完成" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--primary", onClick: handleInstallUpdate, style: { fontSize: 13 }, children: "安装更新" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: () => downloadedPath && window.api.showUpdateInFolder(downloadedPath), style: { fontSize: 13 }, children: "打开文件夹" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: () => setUpdatePhase("idle"), style: { fontSize: 13 }, children: "稍后" })
+        ] })
+      ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 16, padding: "16px 20px", background: "var(--bg-card)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)", fontSize: 13 }, children: "快速上手" }),
@@ -17968,23 +18059,48 @@ function IdChip({ label, value, platform }) {
     ] })
   ] });
 }
-function ConnectionCard({ record, onDelete }) {
+function ConnectionCard({
+  record,
+  onDelete,
+  selectMode,
+  selected,
+  onToggleSelect
+}) {
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(
     "div",
     {
       style: {
         background: "var(--bg-card)",
-        border: "1px solid var(--border)",
+        border: selected ? "2px solid var(--accent)" : "1px solid var(--border)",
         borderRadius: "var(--radius)",
         padding: "18px 20px",
         boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         display: "flex",
         flexDirection: "column",
-        gap: 12
+        gap: 12,
+        cursor: selectMode ? "pointer" : "default"
       },
+      onClick: selectMode ? onToggleSelect : void 0,
       children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
+            selectMode && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "div",
+              {
+                style: {
+                  width: 18,
+                  height: 18,
+                  borderRadius: 4,
+                  border: selected ? "none" : "1.5px solid var(--text-muted)",
+                  background: selected ? "var(--accent)" : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0
+                },
+                children: selected && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: "#fff", fontSize: 12, fontWeight: 700 }, children: "✓" })
+              }
+            ),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }, children: record.hostname ?? "未知主机" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "span",
@@ -18031,10 +18147,13 @@ function ConnectionCard({ record, onDelete }) {
               "配对于 ",
               new Date(record.pairedAt).toLocaleDateString("zh-CN")
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
+            !selectMode && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                onClick: onDelete,
+                onClick: (e) => {
+                  e.stopPropagation();
+                  onDelete();
+                },
                 className: "btn btn--danger",
                 style: { padding: "2px 10px", fontSize: 11, fontWeight: 500 },
                 children: "删除"
@@ -18049,6 +18168,9 @@ function ConnectionCard({ record, onDelete }) {
 function ConnectionsPage() {
   const [sessions, setSessions] = reactExports.useState([]);
   const [loading, setLoading] = reactExports.useState(true);
+  const [selectMode, setSelectMode] = reactExports.useState(false);
+  const [selectedIds, setSelectedIds] = reactExports.useState(/* @__PURE__ */ new Set());
+  const [deleting, setDeleting] = reactExports.useState(false);
   const load = reactExports.useCallback(() => {
     setLoading(true);
     window.api.listPairedSessions().then((list) => setSessions(list.sort((a, b2) => b2.lastUsedAt - a.lastUsedAt))).catch(() => setSessions([])).finally(() => setLoading(false));
@@ -18059,13 +18181,72 @@ function ConnectionsPage() {
     await window.api.deleteSession(record.sessionId, record.serverUrl);
     load();
   }, [load]);
+  const toggleSelect = reactExports.useCallback((sessionId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  }, []);
+  const selectAll = reactExports.useCallback(() => {
+    setSelectedIds(new Set(sessions.map((s15) => s15.sessionId)));
+  }, [sessions]);
+  const clearSelection = reactExports.useCallback(() => {
+    setSelectedIds(/* @__PURE__ */ new Set());
+  }, []);
+  const exitSelectMode = reactExports.useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(/* @__PURE__ */ new Set());
+  }, []);
+  const handleBatchDelete = reactExports.useCallback(async () => {
+    const selectedSessions = sessions.filter((s15) => selectedIds.has(s15.sessionId));
+    if (selectedSessions.length === 0) return;
+    if (!confirm(`确定要删除选中的 ${selectedSessions.length} 条配对记录吗？
+所有选中的配对信息都将被清除。`)) return;
+    setDeleting(true);
+    try {
+      await window.api.deleteSessions(selectedSessions.map((s15) => ({ sessionId: s15.sessionId, serverUrl: s15.serverUrl })));
+      exitSelectMode();
+      load();
+    } finally {
+      setDeleting(false);
+    }
+  }, [sessions, selectedIds, exitSelectMode, load]);
   reactExports.useEffect(() => {
     load();
   }, [load]);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "page-title", style: { marginBottom: 0 }, children: "连接记录" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: load, style: { fontSize: 13 }, children: "刷新" })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
+        sessions.length > 0 && !selectMode && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: () => setSelectMode(true), style: { fontSize: 13 }, children: "批量管理" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: load, style: { fontSize: 13 }, children: "刷新" })
+      ] })
+    ] }),
+    selectMode && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "10px 14px", background: "var(--bg-input)", borderRadius: "var(--radius)" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: 13, color: "var(--text-secondary)" }, children: [
+        "已选 ",
+        selectedIds.size,
+        " 项"
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: selectAll, style: { fontSize: 12, padding: "4px 10px" }, children: "全选" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: clearSelection, style: { fontSize: 12, padding: "4px 10px" }, children: "取消全选" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { flex: 1 } }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          className: "btn btn--danger",
+          onClick: handleBatchDelete,
+          disabled: selectedIds.size === 0 || deleting,
+          style: { fontSize: 12, padding: "4px 12px", opacity: selectedIds.size === 0 ? 0.5 : 1 },
+          children: deleting ? "删除中…" : `删除选中 (${selectedIds.size})`
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: exitSelectMode, style: { fontSize: 12, padding: "4px 10px" }, children: "取消" })
     ] }),
     loading ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { color: "var(--text-muted)", fontSize: 13 }, children: "加载中…" }) : sessions.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "div",
@@ -18082,7 +18263,191 @@ function ConnectionsPage() {
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { marginTop: 6 }, children: "前往「配对」页面完成首次配对" })
         ]
       }
-    ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: sessions.map((s15) => /* @__PURE__ */ jsxRuntimeExports.jsx(ConnectionCard, { record: s15, onDelete: () => handleDelete(s15) }, s15.sessionId)) })
+    ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12 }, children: sessions.map((s15) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+      ConnectionCard,
+      {
+        record: s15,
+        onDelete: () => handleDelete(s15),
+        selectMode,
+        selected: selectedIds.has(s15.sessionId),
+        onToggleSelect: () => toggleSelect(s15.sessionId)
+      },
+      s15.sessionId
+    )) })
+  ] });
+}
+const btnBase = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "6px 12px",
+  borderRadius: 6,
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  border: "none",
+  outline: "none",
+  whiteSpace: "nowrap"
+};
+const btnPrimary = {
+  ...btnBase,
+  background: "var(--accent)",
+  color: "#fff",
+  flex: 1
+};
+const btnGhost = {
+  ...btnBase,
+  background: "transparent",
+  color: "var(--text-primary)",
+  border: "1px solid var(--border)"
+};
+function UpdateNotification() {
+  const [state, setState] = reactExports.useState(null);
+  const unsubRef = reactExports.useRef(null);
+  const startDownload = reactExports.useCallback(async () => {
+    if (!state?.result.downloadUrl) return;
+    setState((s15) => s15 ? { ...s15, phase: "downloading", progress: 0 } : s15);
+    unsubRef.current?.();
+    unsubRef.current = window.api.onUpdateProgress(({ progress }) => {
+      setState((s15) => s15 ? { ...s15, progress } : s15);
+    });
+    const res = await window.api.downloadUpdate(state.result.downloadUrl);
+    unsubRef.current?.();
+    unsubRef.current = null;
+    if (res.ok && res.filePath) {
+      setState((s15) => s15 ? { ...s15, phase: "downloaded", filePath: res.filePath, progress: 1 } : s15);
+    } else {
+      setState((s15) => s15 ? { ...s15, phase: "error", errorMsg: "下载失败，请重试" } : s15);
+    }
+  }, [state]);
+  const install = reactExports.useCallback(async () => {
+    if (!state?.filePath) return;
+    await window.api.installUpdate(state.filePath);
+  }, [state]);
+  const showInFolder = reactExports.useCallback(() => {
+    if (!state?.filePath) return;
+    window.api.showUpdateInFolder(state.filePath);
+  }, [state]);
+  const dismiss = reactExports.useCallback(() => setState(null), []);
+  reactExports.useEffect(() => {
+    let cancelled = false;
+    window.api.checkForUpdate().then((res) => {
+      if (cancelled || !res.hasUpdate) return;
+      setState({ phase: "available", result: res, progress: 0 });
+    });
+    return () => {
+      cancelled = true;
+      unsubRef.current?.();
+    };
+  }, []);
+  if (!state) return null;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+    position: "fixed",
+    top: 12,
+    right: 12,
+    width: 264,
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+    boxShadow: "0 4px 16px rgba(0,0,0,.12)",
+    padding: 14,
+    zIndex: 9999
+  }, children: [
+    state.phase === "available" && /* @__PURE__ */ jsxRuntimeExports.jsx(AvailableView, { result: state.result, onDownload: startDownload, onDismiss: dismiss }),
+    state.phase === "downloading" && /* @__PURE__ */ jsxRuntimeExports.jsx(DownloadingView, { progress: state.progress }),
+    state.phase === "downloaded" && /* @__PURE__ */ jsxRuntimeExports.jsx(DownloadedView, { onInstall: install, onShowFolder: showInFolder, onDismiss: dismiss }),
+    state.phase === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      ErrorView,
+      {
+        message: state.errorMsg,
+        onRetry: () => setState((s15) => s15 ? { ...s15, phase: "available" } : s15),
+        onDismiss: dismiss
+      }
+    )
+  ] });
+}
+function AvailableView({
+  result,
+  onDownload,
+  onDismiss
+}) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", marginBottom: 8 }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: 13, fontWeight: 600, flex: 1, color: "var(--text-primary)" }, children: [
+        "新版本 ",
+        result.version
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: onDismiss,
+          style: { ...btnBase, padding: "2px 4px", color: "var(--text-muted)", fontSize: 15 },
+          children: "✕"
+        }
+      )
+    ] }),
+    result.releaseNotes && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: {
+      fontSize: 11,
+      color: "var(--text-muted)",
+      margin: "0 0 10px",
+      overflow: "hidden",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical"
+    }, children: result.releaseNotes }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8 }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { style: btnPrimary, onClick: onDownload, children: "立即下载" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { style: btnGhost, onClick: onDismiss, children: "暂不更新" })
+    ] })
+  ] });
+}
+function DownloadingView({ progress }) {
+  const pct = Math.round(progress * 100);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", marginBottom: 8 }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 13, fontWeight: 600, flex: 1, color: "var(--text-primary)" }, children: "下载中..." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: 12, color: "var(--text-muted)" }, children: [
+        pct,
+        "%"
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden" }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
+      height: "100%",
+      width: `${pct}%`,
+      background: "var(--accent)",
+      borderRadius: 2,
+      transition: "width 0.2s ease"
+    } }) })
+  ] });
+}
+function DownloadedView({ onInstall, onShowFolder, onDismiss }) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { style: { fontSize: 13, fontWeight: 600, margin: "0 0 10px", color: "var(--text-primary)" }, children: "下载完成" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { style: btnPrimary, onClick: onInstall, children: "安装更新" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { style: btnGhost, onClick: onShowFolder, children: "打开文件夹" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { style: btnGhost, onClick: onDismiss, children: "稍后" })
+    ] })
+  ] });
+}
+function ErrorView({
+  message,
+  onRetry,
+  onDismiss
+}) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "flex-start", marginBottom: 8, gap: 8 }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: 12, color: "#d32f2f", flex: 1 }, children: message ?? "下载失败" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: onDismiss,
+          style: { ...btnBase, padding: "2px 4px", color: "var(--text-muted)", fontSize: 15, flexShrink: 0 },
+          children: "✕"
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("button", { style: { ...btnGhost, width: "100%" }, onClick: onRetry, children: "重试" })
   ] });
 }
 const NAV = [
@@ -18117,7 +18482,8 @@ function App() {
       page === "session" && /* @__PURE__ */ jsxRuntimeExports.jsx(SessionPage, {}),
       page === "connections" && /* @__PURE__ */ jsxRuntimeExports.jsx(ConnectionsPage, {}),
       page === "settings" && /* @__PURE__ */ jsxRuntimeExports.jsx(SettingsPage, {})
-    ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(UpdateNotification, {})
   ] });
 }
 client.createRoot(document.getElementById("root")).render(

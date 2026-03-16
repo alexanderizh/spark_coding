@@ -2,15 +2,18 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:open_file_plus/open_file_plus.dart' show OpenFile;
+import 'package:open_filex/open_filex.dart' show OpenFilex;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../config/app_config.dart';
 
 enum UpdateStatus { idle, checking, available, downloading, downloaded, error }
 
 class UpdateState {
   const UpdateState({
     this.status = UpdateStatus.idle,
+    this.updateBaseUrl = AppConfig.defaultUpdateBaseUrl,
     this.availableVersion,
     this.downloadUrl,
     this.releaseNotes,
@@ -21,6 +24,7 @@ class UpdateState {
   });
 
   final UpdateStatus status;
+  final String updateBaseUrl;
   final String? availableVersion;
   final String? downloadUrl;
   final String? releaseNotes;
@@ -31,6 +35,7 @@ class UpdateState {
 
   UpdateState copyWith({
     UpdateStatus? status,
+    String? updateBaseUrl,
     String? availableVersion,
     String? downloadUrl,
     String? releaseNotes,
@@ -41,6 +46,7 @@ class UpdateState {
   }) {
     return UpdateState(
       status: status ?? this.status,
+      updateBaseUrl: updateBaseUrl ?? this.updateBaseUrl,
       availableVersion: availableVersion ?? this.availableVersion,
       downloadUrl: downloadUrl ?? this.downloadUrl,
       releaseNotes: releaseNotes ?? this.releaseNotes,
@@ -53,10 +59,33 @@ class UpdateState {
 }
 
 class UpdateNotifier extends StateNotifier<UpdateState> {
-  UpdateNotifier() : super(const UpdateState());
+  UpdateNotifier() : super(const UpdateState()) {
+    _loadPersistedUrl();
+  }
 
   final _dio = Dio();
   static const _dismissedKey = 'dismissed_update_version';
+  static const _updateBaseUrlKey = 'update_base_url';
+
+  Future<void> _loadPersistedUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_updateBaseUrlKey);
+    if (saved != null && saved.isNotEmpty) {
+      state = state.copyWith(updateBaseUrl: saved);
+    }
+  }
+
+  Future<void> setUpdateBaseUrl(String url) async {
+    final trimmed = url.trim();
+    final prefs = await SharedPreferences.getInstance();
+    if (trimmed.isEmpty) {
+      await prefs.remove(_updateBaseUrlKey);
+      state = state.copyWith(updateBaseUrl: AppConfig.defaultUpdateBaseUrl);
+    } else {
+      await prefs.setString(_updateBaseUrlKey, trimmed);
+      state = state.copyWith(updateBaseUrl: trimmed);
+    }
+  }
 
   /// Compares version strings like "1.0.10" vs "1.0.9" correctly.
   bool _isNewer(String remote, String current) {
@@ -74,14 +103,15 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
     return false;
   }
 
-  Future<void> checkForUpdate(String serverUrl, String currentVersion) async {
+  /// Checks for updates. Returns true if a new version is available.
+  Future<bool> checkForUpdate(String currentVersion) async {
     state = state.copyWith(status: UpdateStatus.checking);
     try {
       final prefs = await SharedPreferences.getInstance();
       final dismissed = prefs.getString(_dismissedKey);
 
       final resp = await _dio.get(
-        '$serverUrl/api/version/latest',
+        '${state.updateBaseUrl}/api/version/latest',
         queryParameters: {'platform': 'android'},
         options: Options(receiveTimeout: const Duration(seconds: 10)),
       );
@@ -89,7 +119,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       final body = resp.data as Map<String, dynamic>?;
       if (body == null || body['success'] != true || body['data'] == null) {
         state = state.copyWith(status: UpdateStatus.idle);
-        return;
+        return false;
       }
 
       final data = body['data'] as Map<String, dynamic>;
@@ -99,7 +129,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
 
       if (!_isNewer(remoteVersion, currentVersion)) {
         state = state.copyWith(status: UpdateStatus.idle);
-        return;
+        return false;
       }
 
       state = state.copyWith(
@@ -109,9 +139,10 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
         releaseNotes: releaseNotes,
         dismissedVersion: dismissed,
       );
+      return true;
     } catch (_) {
-      // Silently ignore network errors — keep idle
-      state = state.copyWith(status: UpdateStatus.idle);
+      state = state.copyWith(status: UpdateStatus.idle, errorMessage: '检查更新失败，请检查网络');
+      return false;
     }
   }
 
@@ -148,7 +179,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
     final path = state.localFilePath;
     if (path == null) return;
     if (Platform.isAndroid) {
-      await OpenFile.open(path);
+      await OpenFilex.open(path);
     }
   }
 

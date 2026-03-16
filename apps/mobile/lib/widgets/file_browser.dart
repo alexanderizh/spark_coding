@@ -30,7 +30,7 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
 
   Future<void> _confirmSelectCurrentPath() async {
     final path = _currentPath;
-    if (path == null || _isLoading) return;
+    if (path == null || path == _drivesRoot || _isLoading) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -112,17 +112,22 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
     });
   }
 
+  static const String _drivesRoot = '__drives__';
+
   bool _isWindowsPath(String path) {
-    return path.contains('\\');
+    return path == _drivesRoot || path.contains('\\') || RegExp(r'^[A-Za-z]:\\').hasMatch(path);
   }
 
   String _joinPath(String base, String name) {
+    // At drives root, entry names are full drive paths (e.g. "C:\")
+    if (base == _drivesRoot) return name;
     final separator = _isWindowsPath(base) ? '\\' : '/';
     if (base.endsWith(separator)) return '$base$name';
     return '$base$separator$name';
   }
 
   String _parentPath(String path) {
+    if (path == _drivesRoot) return _drivesRoot;
     final isWindows = _isWindowsPath(path);
     final separator = isWindows ? '\\' : '/';
 
@@ -139,9 +144,10 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
     final normalized = path.endsWith('\\') && path.length > 3
         ? path.substring(0, path.length - 1)
         : path;
+    // At drive root (e.g. "C:\") → go to drives list
     final driveRootMatch = RegExp(r'^[A-Za-z]:\\?$').hasMatch(normalized);
     if (driveRootMatch) {
-      return normalized.endsWith('\\') ? normalized : '$normalized\\';
+      return _drivesRoot;
     }
     final index = normalized.lastIndexOf(separator);
     if (index <= 2) {
@@ -150,8 +156,15 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
     return normalized.substring(0, index);
   }
 
+  bool get _isAtRoot {
+    if (_currentPath == null) return true;
+    if (_currentPath == _drivesRoot) return true;
+    if (!_isWindowsPath(_currentPath!)) return _currentPath == '/';
+    return false;
+  }
+
   void _goUp() {
-    if (_currentPath == null) return;
+    if (_currentPath == null || _currentPath == _drivesRoot) return;
     final parent = _parentPath(_currentPath!);
     if (parent == _currentPath) return;
     _navigateTo(parent);
@@ -209,7 +222,7 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_upward),
-                  onPressed: _goUp,
+                  onPressed: _isAtRoot ? null : _goUp,
                   tooltip: '上一级',
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.all(6),
@@ -227,7 +240,7 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
                       border: Border.all(color: const Color.fromARGB(255, 238, 238, 238)!),
                     ),
                     child: Text(
-                      _currentPath ?? 'Loading...',
+                      _currentPath == _drivesRoot ? '本地磁盘' : (_currentPath ?? 'Loading...'),
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 13,
@@ -335,7 +348,7 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_currentPath != null && !_isLoading)
+                onPressed: (_currentPath != null && _currentPath != _drivesRoot && !_isLoading)
                     ? _confirmSelectCurrentPath
                     : null,
                 style: ElevatedButton.styleFrom(

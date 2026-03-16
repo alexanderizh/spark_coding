@@ -44,13 +44,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   }
 
   Future<void> _checkForUpdate() async {
-    final sessionService = ref.read(sessionServiceProvider);
-    final serverUrl = sessionService.serverUrl;
-    if (serverUrl == null || serverUrl.isEmpty) return;
     final info = await PackageInfo.fromPlatform();
     await ref
         .read(updateProvider.notifier)
-        .checkForUpdate(serverUrl, info.version);
+        .checkForUpdate(info.version);
     // After check, if update available show dialog (unless already dismissed)
     if (!mounted) return;
     final updateState = ref.read(updateProvider);

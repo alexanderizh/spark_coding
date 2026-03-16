@@ -634,6 +634,25 @@ export class TerminalBridge extends EventEmitter {
 
   // ── File System ──────────────────────────────────────────────────────────────
 
+  private async handleFsListDrives(payload: FsListPayload): Promise<void> {
+    const drives: FsEntry[] = []
+    for (let i = 65; i <= 90; i++) {
+      const drive = `${String.fromCharCode(i)}:\\`
+      try {
+        await fs.access(drive)
+        drives.push({ name: drive, isDirectory: true })
+      } catch {
+        // Drive not accessible, skip
+      }
+    }
+    const response: FsListResultPayload = {
+      sessionId: payload.sessionId,
+      path: '__drives__',
+      entries: drives,
+    }
+    this.socket?.emit(Events.FS_LIST_RESULT, response)
+  }
+
   private async handleFsList(payload: FsListPayload): Promise<void> {
     if (!this.config) return
 
@@ -642,11 +661,13 @@ export class TerminalBridge extends EventEmitter {
       requestedPath = this.config.cwd
     }
 
-    // Ensure path is absolute if possible, or relative to CWD?
-    // Usually requestedPath will be absolute from previous listing.
-    // If it's empty, use CWD.
-
     this.log('收到 fs:list path=%s', requestedPath)
+
+    // Special: list Windows drives
+    if (requestedPath === '__drives__') {
+      await this.handleFsListDrives(payload)
+      return
+    }
 
     try {
       const entries = await fs.readdir(requestedPath, { withFileTypes: true })

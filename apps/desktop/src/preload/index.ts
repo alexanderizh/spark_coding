@@ -110,6 +110,9 @@ contextBridge.exposeInMainWorld('api', {
   installUpdate: (filePath: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('update:install', filePath),
 
+  showUpdateInFolder: (filePath: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('update:showInFolder', filePath),
+
   onUpdateProgress: (cb: (v: { progress: number }) => void): Unsubscribe => {
     const handler = (_: IpcRendererEvent, v: { progress: number }) => cb(v)
     ipcRenderer.on('update:progress', handler)

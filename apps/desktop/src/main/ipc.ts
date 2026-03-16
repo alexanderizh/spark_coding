@@ -193,6 +193,11 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
       return { ok: false }
     }
   })
+
+  ipcMain.handle('update:showInFolder', (_e, filePath: string) => {
+    shell.showItemInFolder(filePath)
+    return { ok: true }
+  })
 }
 
 /** Returns true if remote version string is newer than current. */

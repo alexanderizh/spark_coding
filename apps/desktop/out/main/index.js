@@ -755,6 +755,23 @@ class TerminalBridge extends events.EventEmitter {
     }
   }
   // ── File System ──────────────────────────────────────────────────────────────
+  async handleFsListDrives(payload) {
+    const drives = [];
+    for (let i = 65; i <= 90; i++) {
+      const drive = `${String.fromCharCode(i)}:\\`;
+      try {
+        await fs$1.access(drive);
+        drives.push({ name: drive, isDirectory: true });
+      } catch {
+      }
+    }
+    const response = {
+      sessionId: payload.sessionId,
+      path: "__drives__",
+      entries: drives
+    };
+    this.socket?.emit(shared.Events.FS_LIST_RESULT, response);
+  }
   async handleFsList(payload) {
     if (!this.config) return;
     let requestedPath = payload.path;
@@ -762,6 +779,10 @@ class TerminalBridge extends events.EventEmitter {
       requestedPath = this.config.cwd;
     }
     this.log("收到 fs:list path=%s", requestedPath);
+    if (requestedPath === "__drives__") {
+      await this.handleFsListDrives(payload);
+      return;
+    }
     try {
       const entries = await fs$1.readdir(requestedPath, { withFileTypes: true });
       const resultEntries = entries.map((ent) => ({
@@ -1203,6 +1224,10 @@ function setupIpc(getWindow) {
     } catch (_) {
       return { ok: false };
     }
+  });
+  electron.ipcMain.handle("update:showInFolder", (_e, filePath) => {
+    electron.shell.showItemInFolder(filePath);
+    return { ok: true };
   });
 }
 function isNewer(remote, current) {

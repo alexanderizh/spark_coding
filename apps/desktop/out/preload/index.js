@@ -56,6 +56,7 @@ electron.contextBridge.exposeInMainWorld("api", {
   checkForUpdate: () => electron.ipcRenderer.invoke("update:check"),
   downloadUpdate: (url) => electron.ipcRenderer.invoke("update:download", url),
   installUpdate: (filePath) => electron.ipcRenderer.invoke("update:install", filePath),
+  showUpdateInFolder: (filePath) => electron.ipcRenderer.invoke("update:showInFolder", filePath),
   onUpdateProgress: (cb) => {
     const handler = (_, v) => cb(v);
     electron.ipcRenderer.on("update:progress", handler);
