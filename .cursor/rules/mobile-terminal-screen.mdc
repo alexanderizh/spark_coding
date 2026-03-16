@@ -1,0 +1,22 @@
+---
+description: Mobile 终端页渲染与滚动规范
+globs: apps/mobile/lib/screens/terminal_screen.dart
+alwaysApply: false
+---
+
+# Mobile 终端页渲染与滚动规范
+
+## 首次连接渲染不刷新
+
+- 终端数据（`terminal:snapshot` / `terminal:output`）到达后，不能依赖外部交互触发重绘；需要在首次收到数据时主动触发一次 UI 刷新（例如 `setState`），避免出现“页面空白直到用户点击输入框/展开键盘才渲染”的问题。
+
+## 新消息与键盘展开时自动滚动到底部
+
+- 终端 UI 必须在每次收到新输出时自动滚动到底部，行为与常见聊天应用一致。
+- 键盘展开导致 `MediaQuery.viewInsets.bottom` 增大时，也需要自动滚动到底部，防止最新输出被输入区遮挡。
+- 滚动需要节流到每帧一次（使用 `addPostFrameCallback` + 标记位），并在 `ScrollController.hasClients` 且 `position.hasContentDimensions` 时再执行 `jumpTo(maxScrollExtent)`。
+
+## 终端内容留白
+
+- 终端内容区域需要提供上下内边距（例如 `TerminalView.padding`）以形成舒适留白，并为底部输入区域预留视觉空间。
+

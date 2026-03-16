@@ -59,6 +59,7 @@ declare global {
       // Device
       getDeviceId:    () => Promise<string>
       getDeviceStatus: () => Promise<DesktopStatusReport>
+      getAppVersion:  () => Promise<string>
 
       // Settings
       getSettings:    () => Promise<AppSettings>

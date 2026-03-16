@@ -11,10 +11,12 @@ export function SettingsPage(): React.ReactElement {
   const [saved, setSaved] = useState(false)
   const [detecting, setDetecting] = useState(false)
   const [deviceId, setDeviceId] = useState<string>('')
+  const [appVersion, setAppVersion] = useState<string>('')
 
   useEffect(() => {
     window.api.getSettings().then(setSettings)
     window.api.getDeviceId().then(setDeviceId).catch(() => {})
+    window.api.getAppVersion().then(setAppVersion).catch(() => {})
   }, [])
 
   const handleChange = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -139,6 +141,16 @@ export function SettingsPage(): React.ReactElement {
           <div className="form-hint" style={{ marginTop: 4 }}>
             该 ID 由硬件信息生成，固定不变。手机端通过此 ID 识别本机
           </div>
+        </div>
+      )}
+
+      {/* Version info */}
+      {appVersion && (
+        <div style={{ marginTop: 16, padding: '14px 20px', background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>版本</div>
+          <code style={{ fontFamily: 'monospace', fontSize: 13, color: 'var(--text-muted)' }}>
+            v{appVersion}
+          </code>
         </div>
       )}
 

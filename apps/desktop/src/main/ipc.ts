@@ -15,6 +15,8 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
   // ── Device ───────────────────────────────────────────────────────────────
   ipcMain.handle('device:getId', () => getOrCreateDeviceId())
 
+  ipcMain.handle('device:getVersion', () => app.getVersion())
+
   ipcMain.handle('device:getStatus', () => {
     const settings   = getSettings()
     const deviceId   = getOrCreateDeviceId()

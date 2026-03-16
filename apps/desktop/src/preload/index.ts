@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('api', {
   getDeviceStatus: (): Promise<unknown> =>
     ipcRenderer.invoke('device:getStatus'),
 
+  getAppVersion: (): Promise<string> =>
+    ipcRenderer.invoke('device:getVersion'),
+
   // ── Settings ─────────────────────────────────────────────────────────────────
   getSettings: (): Promise<unknown> =>
     ipcRenderer.invoke('settings:get'),
