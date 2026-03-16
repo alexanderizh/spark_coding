@@ -12,6 +12,7 @@ electron.contextBridge.exposeInMainWorld("api", {
   // ── Paired sessions ───────────────────────────────────────────────────────────
   listPairedSessions: () => electron.ipcRenderer.invoke("session:listPaired"),
   deleteSession: (sessionId, serverUrl) => electron.ipcRenderer.invoke("session:delete", sessionId, serverUrl),
+  deleteSessions: (sessions) => electron.ipcRenderer.invoke("session:deleteBatch", sessions),
   // ── Session ───────────────────────────────────────────────────────────────────
   startSession: () => electron.ipcRenderer.invoke("session:start"),
   stopSession: () => electron.ipcRenderer.invoke("session:stop"),

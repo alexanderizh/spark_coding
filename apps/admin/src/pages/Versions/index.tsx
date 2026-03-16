@@ -177,6 +177,7 @@ export default function VersionsPage() {
       title: '操作',
       key: 'actions',
       width: 120,
+      fixed: 'right',
       render: (_: unknown, record: VersionItem) => (
         <Space size="small">
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>

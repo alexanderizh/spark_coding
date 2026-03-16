@@ -1088,6 +1088,15 @@ function setupIpc(getWindow) {
     }
     return { ok: true };
   });
+  electron.ipcMain.handle("session:deleteBatch", async (_e, sessions) => {
+    const results = await Promise.allSettled(
+      sessions.map(
+        ({ sessionId, serverUrl }) => fetch(`${serverUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => null)
+      )
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    return { ok: true, failed };
+  });
   electron.ipcMain.handle("settings:get", () => getSettings());
   electron.ipcMain.handle("settings:save", (_e, patch) => {
     saveSettings(patch);
