@@ -32,6 +32,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   StreamSubscription<TerminalOutput>? _outputSub;
   StreamSubscription<TerminalSnapshot>? _snapshotSub;
   StreamSubscription<RuntimeStatusEvent>? _runtimeSub;
+  Timer? _runtimeEnsureTimer;
   late final Terminal _terminal;
   final ScrollController _terminalScrollController = ScrollController();
   bool _isTyping = false;
@@ -62,6 +63,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _outputSub?.cancel();
     _snapshotSub?.cancel();
     _runtimeSub?.cancel();
+    _runtimeEnsureTimer?.cancel();
     _terminalScrollController.dispose();
     super.dispose();
   }
@@ -75,6 +77,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         setState(() {
           _runtimeEnsuring = false;
         });
+      _runtimeEnsureTimer?.cancel();
+      _runtimeEnsureTimer = null;
       _showSessionError(error.message);
     });
   }
@@ -84,6 +88,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
 
     _snapshotSub = socketService.terminalSnapshot.listen((snap) {
       if (!mounted) return;
+      _markRuntimeReady();
       _terminal.write('\x1B[2J\x1B[H');
       _terminal.write(snap.snapshot);
       _renderAndScrollTerminal();
@@ -91,6 +96,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
 
     _outputSub = socketService.terminalOutput.listen((output) {
       if (!mounted) return;
+      _markRuntimeReady();
       _terminal.write(output.data);
       _renderAndScrollTerminal();
     });
@@ -126,16 +132,34 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       setState(() {
         _runtimeEnsuring = false;
       });
+      _runtimeEnsureTimer?.cancel();
+      _runtimeEnsureTimer = null;
       if (!event.ready) {
         _showSessionError(event.message ?? 'Claude 启动失败');
       }
     });
   }
 
+  void _markRuntimeReady() {
+    if (!_runtimeEnsuring || !mounted) return;
+    setState(() {
+      _runtimeEnsuring = false;
+    });
+    _runtimeEnsureTimer?.cancel();
+    _runtimeEnsureTimer = null;
+  }
+
   void _ensureRuntime() {
     final socketService = ref.read(socketServiceProvider);
+    _runtimeEnsureTimer?.cancel();
     setState(() {
       _runtimeEnsuring = true;
+    });
+    _runtimeEnsureTimer = Timer(const Duration(seconds: 8), () {
+      if (!mounted || !_runtimeEnsuring) return;
+      setState(() {
+        _runtimeEnsuring = false;
+      });
     });
     socketService.sendRuntimeEnsure('claude');
   }
