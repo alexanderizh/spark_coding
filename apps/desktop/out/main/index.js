@@ -92,7 +92,9 @@ function createTray() {
     if (img.isEmpty()) {
       icon = electron.nativeImage.createEmpty();
     } else {
-      icon = img.resize({ width: 16, height: 16 });
+      const resized = process.platform === "win32" ? img.crop({ x: 112, y: 152, width: 288, height: 208 }).resize({ width: 20, height: 20 }) : img.resize({ width: 16, height: 16 });
+      icon = resized;
+      icon.setTemplateImage(false);
     }
   } catch {
     icon = electron.nativeImage.createEmpty();
@@ -116,6 +118,30 @@ function createTray() {
   tray.setContextMenu(menu);
   tray.on("click", () => showMainWindow());
 }
+function readVersionFromPackageJson(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.version === "string" && parsed.version.trim()) {
+      return parsed.version.trim();
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+function getAppVersion() {
+  const candidatePaths = [
+    path.join(__dirname, "../../package.json"),
+    path.join(electron.app.getAppPath(), "package.json")
+  ];
+  for (const candidate of candidatePaths) {
+    const version = readVersionFromPackageJson(candidate);
+    if (version) return version;
+  }
+  return electron.app.getVersion();
+}
 function runHealthCheck(claudePath) {
   const claudeCheck = checkClaude(claudePath);
   const terminalCheck = checkTerminalLayer();
@@ -137,7 +163,7 @@ function buildStatusReport(deviceId, result, startTime) {
     deviceId,
     hostname: os.hostname(),
     platform: process.platform,
-    appVersion: electron.app.getVersion(),
+    appVersion: getAppVersion(),
     overallStatus: result.overallStatus,
     claudeStatus: result.claudeStatus,
     terminalStatus: result.terminalStatus,
@@ -1032,7 +1058,7 @@ function collectMacAddresses() {
 let bridge = null;
 function setupIpc(getWindow) {
   electron.ipcMain.handle("device:getId", () => getOrCreateDeviceId());
-  electron.ipcMain.handle("device:getVersion", () => electron.app.getVersion());
+  electron.ipcMain.handle("device:getVersion", () => getAppVersion());
   electron.ipcMain.handle("device:getStatus", () => {
     const settings = getSettings();
     const deviceId = getOrCreateDeviceId();
@@ -1115,6 +1141,10 @@ function setupIpc(getWindow) {
   electron.ipcMain.handle("app:relaunch", () => {
     electron.app.relaunch();
     electron.app.exit(0);
+  });
+  electron.ipcMain.handle("app:quit", () => {
+    setQuitting(true);
+    electron.app.quit();
   });
   electron.ipcMain.on("xterm:snapshot", (_e, snapshot) => {
     bridge?.setXtermSnapshot(snapshot);

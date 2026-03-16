@@ -77,6 +77,7 @@ declare global {
       getOutputBuffer:  () => Promise<string>
       restartClaude:   () => Promise<{ ok: boolean; error?: string }>
       relaunchApp:     () => Promise<void>
+      quitApp:         () => Promise<void>
       reportXtermSnapshot: (snapshot: string) => void
 
       // Events (return unsubscribe fn)

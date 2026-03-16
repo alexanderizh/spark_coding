@@ -41,6 +41,14 @@ export function SettingsPage(): React.ReactElement {
     }
   }, [handleChange])
 
+  const handleRestartApp = useCallback(() => {
+    window.api.relaunchApp()
+  }, [])
+
+  const handleQuitApp = useCallback(() => {
+    window.api.quitApp()
+  }, [])
+
   return (
     <>
       <h2 className="page-title">设置</h2>
@@ -153,6 +161,23 @@ export function SettingsPage(): React.ReactElement {
           </code>
         </div>
       )}
+
+      <div style={{ marginTop: 16, padding: '14px 20px', background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+          后台程序控制
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn btn--ghost" onClick={handleRestartApp}>
+            重启后台程序
+          </button>
+          <button className="btn btn--danger" onClick={handleQuitApp}>
+            关闭后台程序
+          </button>
+        </div>
+        <div className="form-hint" style={{ marginTop: 8 }}>
+          安装新版本前可先关闭后台程序；若需快速恢复可使用重启。
+        </div>
+      </div>
 
       {/* Help section */}
       <div style={{ marginTop: 16, padding: '16px 20px', background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>

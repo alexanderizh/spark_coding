@@ -12,8 +12,11 @@ export function createTray(): void {
     if (img.isEmpty()) {
       icon = nativeImage.createEmpty()
     } else {
-      // 固定 16x16，避免托盘图标显示异常
-      icon = img.resize({ width: 16, height: 16 })
+      const resized = process.platform === 'win32'
+        ? img.crop({ x: 112, y: 152, width: 288, height: 208 }).resize({ width: 20, height: 20 })
+        : img.resize({ width: 16, height: 16 })
+      icon = resized
+      icon.setTemplateImage(false)
     }
   } catch {
     icon = nativeImage.createEmpty()

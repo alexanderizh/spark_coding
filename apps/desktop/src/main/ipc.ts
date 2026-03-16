@@ -4,6 +4,8 @@ import { getSettings, saveSettings, getEffectiveServerUrl, AppSettings, PairedSe
 import { detectClaudePath }                              from './claude-detector'
 import { getOrCreateDeviceId }                           from './device-id'
 import { runHealthCheck, buildStatusReport }             from './health-checker'
+import { getAppVersion }                                 from './app-version'
+import { setQuitting } from './window-manager'
 
 let bridge: TerminalBridge | null = null
 
@@ -15,7 +17,7 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
   // ── Device ───────────────────────────────────────────────────────────────
   ipcMain.handle('device:getId', () => getOrCreateDeviceId())
 
-  ipcMain.handle('device:getVersion', () => app.getVersion())
+  ipcMain.handle('device:getVersion', () => getAppVersion())
 
   ipcMain.handle('device:getStatus', () => {
     const settings   = getSettings()
@@ -121,6 +123,11 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('app:relaunch', () => {
     app.relaunch()
     app.exit(0)
+  })
+
+  ipcMain.handle('app:quit', () => {
+    setQuitting(true)
+    app.quit()
   })
 
   ipcMain.on('xterm:snapshot', (_e: IpcMainEvent, snapshot: string) => {

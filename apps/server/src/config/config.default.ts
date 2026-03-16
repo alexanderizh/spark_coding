@@ -2,6 +2,7 @@ import { MidwayConfig } from '@midwayjs/core';
 import { Session } from '../entity/session.entity';
 import { Device } from '../entity/device.entity';
 import { DesktopStatus } from '../entity/desktop-status.entity';
+import { Version } from '../entity/version.entity';
 
 export default {
   // Cookie signing keys (required by Midway Koa)
@@ -42,7 +43,7 @@ export default {
         logging: false,
         // logging: process.env.NODE_ENV === 'local',
         timezone: '+00:00',
-        entities: [Session, Device, DesktopStatus],
+        entities: [Session, Device, DesktopStatus, Version],
       },
     },
   },

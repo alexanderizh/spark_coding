@@ -20,6 +20,7 @@ electron.contextBridge.exposeInMainWorld("api", {
   getLogBuffer: () => electron.ipcRenderer.invoke("session:getLogBuffer"),
   restartClaude: () => electron.ipcRenderer.invoke("session:restartClaude"),
   relaunchApp: () => electron.ipcRenderer.invoke("app:relaunch"),
+  quitApp: () => electron.ipcRenderer.invoke("app:quit"),
   // ── Events: main → renderer ───────────────────────────────────────────────────
   onStatus: (cb) => {
     const handler = (_, v) => cb(v);

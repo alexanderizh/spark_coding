@@ -17739,6 +17739,12 @@ function SettingsPage() {
       alert("未能自动检测到 Claude CLI，请手动输入路径。\n\n确保已安装：npm install -g @anthropic-ai/claude-code");
     }
   }, [handleChange]);
+  const handleRestartApp = reactExports.useCallback(() => {
+    window.api.relaunchApp();
+  }, []);
+  const handleQuitApp = reactExports.useCallback(() => {
+    window.api.quitApp();
+  }, []);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "page-title", children: "设置" }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", children: [
@@ -17831,6 +17837,14 @@ function SettingsPage() {
         "v",
         appVersion
       ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 16, padding: "14px 20px", background: "var(--bg-card)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontWeight: 600, color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }, children: "后台程序控制" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 10, flexWrap: "wrap" }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--ghost", onClick: handleRestartApp, children: "重启后台程序" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn btn--danger", onClick: handleQuitApp, children: "关闭后台程序" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "form-hint", style: { marginTop: 8 }, children: "安装新版本前可先关闭后台程序；若需快速恢复可使用重启。" })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginTop: 16, padding: "16px 20px", background: "var(--bg-card)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)", fontSize: 13 }, children: "快速上手" }),

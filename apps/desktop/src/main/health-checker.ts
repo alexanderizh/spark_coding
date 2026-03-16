@@ -11,9 +11,9 @@
 import { execFileSync }       from 'child_process'
 import { existsSync }         from 'fs'
 import os                     from 'os'
-import { app }                from 'electron'
 import axios                  from 'axios'
 import { DesktopStatusReport, ServiceRunStatus, DesktopHealthStatus } from '@spark_coder/shared'
+import { getAppVersion } from './app-version'
 
 // ── Health check result ───────────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ export function buildStatusReport(
     deviceId,
     hostname:       os.hostname(),
     platform:       process.platform,
-    appVersion:     app.getVersion(),
+    appVersion:     getAppVersion(),
     overallStatus:  result.overallStatus,
     claudeStatus:   result.claudeStatus,
     terminalStatus: result.terminalStatus,

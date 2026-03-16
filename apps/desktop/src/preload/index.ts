@@ -56,6 +56,9 @@ contextBridge.exposeInMainWorld('api', {
   relaunchApp: (): Promise<void> =>
     ipcRenderer.invoke('app:relaunch'),
 
+  quitApp: (): Promise<void> =>
+    ipcRenderer.invoke('app:quit'),
+
   // ── Events: main → renderer ───────────────────────────────────────────────────
   onStatus: (cb: (v: unknown) => void): Unsubscribe => {
     const handler = (_: IpcRendererEvent, v: unknown) => cb(v)
