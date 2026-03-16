@@ -443,6 +443,11 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           child: ConnectionBadge(status: status),
         ),
         IconButton(
+          icon: const Icon(Icons.tune, size: 20),
+          onPressed: () => context.push(AppRoutes.sessionSettings),
+          tooltip: '会话设置',
+        ),
+        IconButton(
           icon: const Icon(Icons.settings, size: 20),
           onPressed: () => context.push(AppRoutes.settings),
           tooltip: '设置',

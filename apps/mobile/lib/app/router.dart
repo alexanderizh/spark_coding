@@ -6,6 +6,7 @@ import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
 import '../screens/home_screen.dart';
 import '../screens/scanner_screen.dart';
+import '../screens/session_settings_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/terminal_screen.dart';
 
@@ -19,6 +20,7 @@ class AppRoutes {
   static const scan = '/scan';
   static const terminal = '/terminal';
   static const settings = '/settings';
+  static const sessionSettings = '/session-settings';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -55,6 +57,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'settings',
         pageBuilder: (context, state) =>
             _buildPage(state: state, child: const SettingsScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.sessionSettings,
+        name: 'session-settings',
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const SessionSettingsScreen()),
       ),
     ],
     redirect: (context, state) {
@@ -93,7 +101,9 @@ CustomTransitionPage<void> _buildPage({
   required Widget child,
 }) {
   final isModal =
-      state.uri.path == AppRoutes.scan || state.uri.path == AppRoutes.settings;
+      state.uri.path == AppRoutes.scan ||
+      state.uri.path == AppRoutes.settings ||
+      state.uri.path == AppRoutes.sessionSettings;
 
   if (isModal) {
     return CustomTransitionPage<void>(

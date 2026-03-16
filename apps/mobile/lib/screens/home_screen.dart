@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../app/app_restart.dart';
 import '../app/router.dart';
 import '../models/connection_link_model.dart';
 import '../providers/connection_provider.dart';
@@ -49,8 +50,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
   @override
   void didPopNext() {
-    // User returned from terminal/scan/settings — refresh session list
-    ref.read(linkNotifierProvider.notifier).refreshStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AppRestart.restartApp(context);
+    });
   }
 
   void _listenForDeletion() {
@@ -86,7 +89,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     await context.push(AppRoutes.terminal);
     // Refresh link status after returning from terminal (connection may have changed)
     if (mounted) {
-      ref.read(linkNotifierProvider.notifier).refreshStatus();
+      await ref.read(linkNotifierProvider.notifier).refreshStatus();
     }
   }
 
@@ -152,11 +155,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                         ...onlineLinks.map(
                           (link) => Padding(
                             padding: const EdgeInsets.only(bottom: 10),
-                            child: _LinkCard(
-                              link: link,
-                              onTap: () => unawaited(_openLink(link)),
-                              onDelete: () => unawaited(_confirmDelete(link)),
-                            ),
+                            child: _buildOnlineDismissibleCard(link),
                           ),
                         ),
                       const SizedBox(height: 14),
@@ -189,11 +188,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     );
   }
 
-  Future<void> _confirmDelete(ConnectionLink link) async {
+  Future<bool> _confirmDeleteDialog(
+    ConnectionLink link, {
+    required String title,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除连接'),
+        title: Text(title),
         content: Text(
           '确定要删除与「${link.hostName ?? '该主机'}」的配对记录吗？\n两端的配对信息都将被清除。',
         ),
@@ -210,37 +212,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
         ],
       ),
     );
-    if (confirmed == true && mounted) {
-      await ref.read(linkNotifierProvider.notifier).deleteLink(link);
-    }
+    return confirmed ?? false;
   }
 
-  Widget _buildOfflineDismissibleCard(ConnectionLink link) {
+  Future<void> _deleteLinkWithConfirm(
+    ConnectionLink link, {
+    required String title,
+  }) async {
+    final confirmed = await _confirmDeleteDialog(link, title: title);
+    if (!confirmed || !mounted) return;
+    await ref.read(linkNotifierProvider.notifier).deleteLink(link);
+  }
+
+  Widget _buildOnlineDismissibleCard(ConnectionLink link) {
     return Dismissible(
-      key: ValueKey('offline-${link.id}'),
+      key: ValueKey('online-${link.id}'),
       direction: DismissDirection.endToStart,
       confirmDismiss: (_) async {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('删除离线连接'),
-            content: Text(
-              '确定要删除与「${link.hostName ?? '该主机'}」的离线连接记录吗？\n两端的配对信息都将被清除。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true || !mounted) {
+        final confirmed = await _confirmDeleteDialog(link, title: '删除在线连接');
+        if (!confirmed || !mounted) {
           return false;
         }
         await ref.read(linkNotifierProvider.notifier).deleteLink(link);
@@ -268,7 +258,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
       child: _LinkCard(
         link: link,
         onTap: () => unawaited(_openLink(link)),
-        onDelete: () => unawaited(_confirmDelete(link)),
+        onDelete: () => unawaited(_deleteLinkWithConfirm(link, title: '删除连接')),
+      ),
+    );
+  }
+
+  Widget _buildOfflineDismissibleCard(ConnectionLink link) {
+    return Dismissible(
+      key: ValueKey('offline-${link.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        final confirmed = await _confirmDeleteDialog(link, title: '删除离线连接');
+        if (!confirmed || !mounted) {
+          return false;
+        }
+        await ref.read(linkNotifierProvider.notifier).deleteLink(link);
+        return true;
+      },
+      background: Container(
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(Icons.delete_outline, color: Colors.red),
+            SizedBox(width: 6),
+            Text(
+              '删除',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+      child: _LinkCard(
+        link: link,
+        onTap: () => unawaited(_openLink(link)),
+        onDelete: () => unawaited(_deleteLinkWithConfirm(link, title: '删除连接')),
       ),
     );
   }
