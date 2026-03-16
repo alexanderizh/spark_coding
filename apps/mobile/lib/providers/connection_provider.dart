@@ -99,8 +99,12 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
           state = state.copyWith(status: ConnectionStatus.connected);
         case SocketConnectionStatus.disconnected:
           AppLogger.warn('Connection', '已断开连接');
-          // Only move to disconnected if we were previously connected or
-          // connecting. Avoids spurious state flips on startup.
+          // If we are actively rebuilding the connection (connecting state),
+          // ignore the transient disconnected event emitted by internal
+          // disconnect() — the new socket is already being established.
+          if (state.status == ConnectionStatus.connecting) break;
+          // Only move to disconnected if we were previously connected.
+          // Avoids spurious state flips on startup.
           if (state.status != ConnectionStatus.disconnected) {
             state = state.copyWith(status: ConnectionStatus.disconnected);
           }
