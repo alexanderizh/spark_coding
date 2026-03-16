@@ -130,7 +130,16 @@ class LinkNotifier extends StateNotifier<LinkListState> {
       }
     }
 
-    await _sessionService.replaceLinks(refreshed);
+    // Keep recently-scanned links that the server doesn't know about yet
+    // (server session has mobileDeviceId=null until mobile:join is processed).
+    final refreshedSessionIds = refreshed.map((l) => l.sessionId).toSet();
+    const gracePeriodMs = 3 * 60 * 1000; // 3 minutes
+    final graceLinks = currentLinks.where((l) =>
+      !refreshedSessionIds.contains(l.sessionId) &&
+      (now - l.createdAt) < gracePeriodMs,
+    ).toList();
+
+    await _sessionService.replaceLinks([...refreshed, ...graceLinks]);
     state = state.copyWith(links: _sessionService.links, refreshing: false);
   }
 
@@ -206,6 +215,7 @@ class LinkNotifier extends StateNotifier<LinkListState> {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '$serverUrl/api/session/$token',
+        options: Options(receiveTimeout: const Duration(seconds: 5)),
       );
       final realId = response.data?['data']?['sessionId'] as String?;
       if (realId != null && realId.isNotEmpty) {
