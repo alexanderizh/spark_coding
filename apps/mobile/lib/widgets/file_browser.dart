@@ -24,6 +24,7 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
   Timer? _loadingTimeoutTimer;
   String? _currentPath;
   List<FsEntry> _entries = [];
+  String _searchQuery = '';
   bool _isLoading = true;
   String? _error;
 
@@ -156,10 +157,24 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
     _navigateTo(parent);
   }
 
+  List<FsEntry> _buildVisibleFolders() {
+    final query = _searchQuery.trim().toLowerCase();
+    final folders = _entries.where((e) => e.isDirectory).toList();
+    folders.sort((a, b) {
+      final aHidden = a.name.startsWith('.');
+      final bHidden = b.name.startsWith('.');
+      if (aHidden != bHidden) return aHidden ? 1 : -1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    if (query.isEmpty) return folders;
+    return folders.where((e) => e.name.toLowerCase().contains(query)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final visibleFolders = _buildVisibleFolders();
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: MediaQuery.of(context).size.height * 0.88,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -237,6 +252,33 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+            child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: '搜索当前页文件夹',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                ),
+              ),
+            ),
+          ),
           const Divider(),
 
           // List
@@ -267,24 +309,21 @@ class _FileBrowserState extends ConsumerState<FileBrowser> {
                         ),
                       )
                     : ListView.builder(
-                        itemCount: _entries.length,
+                        itemCount: visibleFolders.length,
                         itemBuilder: (context, index) {
-                          final entry = _entries[index];
+                          final entry = visibleFolders[index];
                           return ListTile(
-                            leading: Icon(
-                              entry.isDirectory ? Icons.folder : Icons.insert_drive_file,
-                              color: entry.isDirectory ? Colors.amber : Colors.grey,
+                            leading: const Icon(
+                              Icons.folder,
+                              color: Colors.amber,
                             ),
                             title: Text(entry.name),
-                            onTap: entry.isDirectory
-                                ? () {
-                                    final base = _currentPath ?? '';
-                                    if (base.isEmpty) return;
-                                    final newPath = _joinPath(base, entry.name);
-                                    _navigateTo(newPath);
-                                  }
-                                : null, // Files are not selectable for CD
-                            enabled: entry.isDirectory,
+                            onTap: () {
+                              final base = _currentPath ?? '';
+                              if (base.isEmpty) return;
+                              final newPath = _joinPath(base, entry.name);
+                              _navigateTo(newPath);
+                            },
                           );
                         },
                       ),
