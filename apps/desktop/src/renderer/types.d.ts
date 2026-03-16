@@ -64,6 +64,7 @@ declare global {
       // Settings
       getSettings:    () => Promise<AppSettings>
       saveSettings:   (patch: Partial<AppSettings>) => Promise<void>
+      getEffectiveServerUrl: () => Promise<{ url: string; source: 'settings' | 'env'; envVar: string }>
       detectClaude:   () => Promise<string | null>
 
       // Paired sessions

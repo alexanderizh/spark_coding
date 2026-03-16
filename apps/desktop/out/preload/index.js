@@ -8,6 +8,7 @@ electron.contextBridge.exposeInMainWorld("api", {
   // ── Settings ─────────────────────────────────────────────────────────────────
   getSettings: () => electron.ipcRenderer.invoke("settings:get"),
   saveSettings: (patch) => electron.ipcRenderer.invoke("settings:save", patch),
+  getEffectiveServerUrl: () => electron.ipcRenderer.invoke("settings:getEffectiveServerUrl"),
   detectClaude: () => electron.ipcRenderer.invoke("claude:detect"),
   // ── Paired sessions ───────────────────────────────────────────────────────────
   listPairedSessions: () => electron.ipcRenderer.invoke("session:listPaired"),

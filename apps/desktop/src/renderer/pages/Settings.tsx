@@ -12,11 +12,13 @@ export function SettingsPage(): React.ReactElement {
   const [detecting, setDetecting] = useState(false)
   const [deviceId, setDeviceId] = useState<string>('')
   const [appVersion, setAppVersion] = useState<string>('')
+  const [effectiveServerUrl, setEffectiveServerUrl] = useState<{ url: string; source: 'settings' | 'env'; envVar: string } | null>(null)
 
   useEffect(() => {
     window.api.getSettings().then(setSettings)
     window.api.getDeviceId().then(setDeviceId).catch(() => {})
     window.api.getAppVersion().then(setAppVersion).catch(() => {})
+    window.api.getEffectiveServerUrl().then(setEffectiveServerUrl).catch(() => {})
   }, [])
 
   const handleChange = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -67,6 +69,15 @@ export function SettingsPage(): React.ReactElement {
           <span className="form-hint">
             中继服务器 API 地址，用于与手机端建立连接。需与 server 应用启动的地址一致。留空则使用环境变量 RELAY_SERVER_URL
           </span>
+          {effectiveServerUrl?.url && (
+            <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius)', fontSize: 12 }}>
+              <span style={{ color: 'var(--text-secondary)' }}>当前使用中: </span>
+              <code style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{effectiveServerUrl.url}</code>
+              <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
+                ({effectiveServerUrl.source === 'settings' ? '来自设置' : `来自环境变量 ${effectiveServerUrl.envVar}`})
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Claude path */}

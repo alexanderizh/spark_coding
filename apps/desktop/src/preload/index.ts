@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (patch: unknown): Promise<void> =>
     ipcRenderer.invoke('settings:save', patch),
 
+  getEffectiveServerUrl: (): Promise<{ url: string; source: 'settings' | 'env'; envVar: string }> =>
+    ipcRenderer.invoke('settings:getEffectiveServerUrl'),
+
   detectClaude: (): Promise<string | null> =>
     ipcRenderer.invoke('claude:detect'),
 

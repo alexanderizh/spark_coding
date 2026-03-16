@@ -6,6 +6,7 @@ import { getOrCreateDeviceId }                           from './device-id'
 import { runHealthCheck, buildStatusReport }             from './health-checker'
 import { getAppVersion }                                 from './app-version'
 import { setQuitting } from './window-manager'
+import { RELAY_SERVER_URL_ENV } from './store'
 
 let bridge: TerminalBridge | null = null
 
@@ -69,6 +70,14 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('settings:save', (_e, patch: Partial<AppSettings>) => {
     saveSettings(patch)
+  })
+
+  ipcMain.handle('settings:getEffectiveServerUrl', () => {
+    return {
+      url: getEffectiveServerUrl(),
+      source: getSettings().serverUrl?.trim() ? 'settings' : 'env',
+      envVar: RELAY_SERVER_URL_ENV,
+    }
   })
 
   ipcMain.handle('claude:detect', () => detectClaudePath())

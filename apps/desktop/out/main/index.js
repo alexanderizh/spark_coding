@@ -1101,6 +1101,13 @@ function setupIpc(getWindow) {
   electron.ipcMain.handle("settings:save", (_e, patch) => {
     saveSettings(patch);
   });
+  electron.ipcMain.handle("settings:getEffectiveServerUrl", () => {
+    return {
+      url: getEffectiveServerUrl(),
+      source: getSettings().serverUrl?.trim() ? "settings" : "env",
+      envVar: RELAY_SERVER_URL_ENV
+    };
+  });
   electron.ipcMain.handle("claude:detect", () => detectClaudePath());
   electron.ipcMain.handle("session:start", async () => {
     const settings = getSettings();
