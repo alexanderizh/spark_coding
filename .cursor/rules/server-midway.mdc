@@ -22,7 +22,17 @@ alwaysApply: false
 
 - 断开连接装饰器为 `OnWSDisConnection`，不是 `OnWSDisconnect`
 - `Application` 类型即 Socket.IO Server，使用 `this.app.to(room).emit()`，不要用 `this.app.io.to()`
-- 多框架（如 Koa + SocketIO）时，需用 `@App('socketIO')` 注入 Socket.IO 实例，否则 `@App()` 会注入主框架（Koa）的 Application
+- 多框架（如 Koa + SocketIO）时，需用 `@App('socketIO')` 注入 Socket.IO 实例，用 `@App('koa')` 注入 Koa 实例；**禁止使用无参 `@App()`**，云上部署时框架初始化顺序可能与本地不同，无参注入可能得到 undefined 导致 `Cannot read properties of undefined (reading 'use')`
+- **`@Configuration` 生命周期类中禁止使用 `@App()` 属性注入**：在 Linux/Docker 环境下，`@App('koa')` 属性注入存在时序问题（框架初始化顺序与 macOS 本地不同），会导致 `onReady` 时 `this.app` 为 `undefined`。应在 `onReady(container: IMidwayContainer)` 中通过 `MidwayFrameworkService` 获取 app：
+  ```ts
+  async onReady(container: IMidwayContainer) {
+    const frameworkService = await container.getAsync(MidwayFrameworkService);
+    const app = frameworkService.getMainApp() as koa.Application;
+  }
+  ```
+- `TypeORMDataSourceManager` 同理，直接通过 `container.getAsync(TypeORMDataSourceManager)` 获取，无需通过 `app.getApplicationContext()`
+- **Docker 构建**：`apps/server/Dockerfile` 的 Node 版本需与本机一致（当前本机 v22，用 `node:22-alpine`）
+- **tsconfig 输出路径问题**：若 `apps/server/tsconfig.json` 的 `paths` 中引用了 `../../packages/shared/src`（TypeScript 源码），tsc 会把 shared 源文件纳入编译范围，导致 `rootDir` 被计算为 monorepo 根目录，编译产物错误地输出到 `dist/apps/server/src/bootstrap.js` 而非 `dist/bootstrap.js`。正确做法：删除 `paths` 别名（通过 `node_modules/@spark_coder/shared` 符号链接解析，shared 的 `package.json` 已配置 `main` 和 `types` 指向 `dist/`），并在 tsconfig 中显式添加 `"rootDir": "src"`
 - `@OnWSMessage` 只接收客户端发送的 payload，不接收 socket 参数；需通过 `@Inject('socket') ctx: Context` 获取当前连接，`Context` 即 socket 实例
 - `runtime:ensure`（mobile→agent）和 `runtime:status`（agent→mobile）需要做角色校验并按 `sessionId` 房间中继，agent 不在线时返回 `session:error`
 - 断连状态必须与角色一致：agent 断连写 `AGENT_DISCONNECTED`，mobile 断连写 `MOBILE_DISCONNECTED`，避免前后端状态误判

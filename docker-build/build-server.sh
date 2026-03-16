@@ -116,6 +116,17 @@ docker tag "$FULL_IMAGE_NAME" "${IMAGE_NAME}:${BRANCH}-latest"
 echo ""
 echo "✓ 镜像构建完成: $FULL_IMAGE_NAME"
 
+# 将构建产物（镜像 tar）移到根目录 outputs 文件夹，并重命名为 spark_coder_版本号
+OUTPUTS_DIR="$PROJECT_ROOT/outputs"
+SERVER_OUTPUT="$OUTPUTS_DIR/server"
+mkdir -p "$SERVER_OUTPUT"
+SERVER_VERSION=$(node -p "require('$PROJECT_ROOT/apps/server/package.json').version" 2>/dev/null || echo "1.0.0")
+IMAGE_TAR="$SERVER_OUTPUT/spark_coder_${SERVER_VERSION}.tar"
+echo "保存镜像到 $IMAGE_TAR ..."
+docker save "$FULL_IMAGE_NAME" -o "$IMAGE_TAR"
+echo "✓ 产物已移至: $IMAGE_TAR"
+ls -la "$IMAGE_TAR"
+
 # 推送到镜像仓库（每次推送：当前版本号 + 分支名-latest）
 if [ "$PUSH" = "1" ]; then
   if ! docker image inspect "$FULL_IMAGE_NAME" &>/dev/null; then

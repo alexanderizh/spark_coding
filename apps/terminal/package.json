@@ -1,6 +1,6 @@
 {
   "name": "@spark_coder/terminal",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Host terminal agent — spawns Claude CLI and relays I/O",
   "bin": {
     "spark": "./bin/spark.js"

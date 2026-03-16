@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app/router.dart';
-import '../models/claude_prompt_model.dart';
 import '../models/session_model.dart';
 import '../providers/connection_provider.dart';
 import '../providers/session_provider.dart';
@@ -15,17 +14,6 @@ import '../services/socket_service.dart';
 import '../utils/app_logger.dart';
 import '../widgets/connection_badge.dart';
 import '../widgets/input_toolbar.dart';
-
-// ---------------------------------------------------------------------------
-// Prompt model
-// ---------------------------------------------------------------------------
-
-class _PendingPrompt {
-  _PendingPrompt({required this.type, required this.rawText});
-
-  final ClaudePromptType type;
-  final String rawText;
-}
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -42,13 +30,10 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   StreamSubscription<SessionError>? _errorSub;
   StreamSubscription<TerminalOutput>? _outputSub;
   StreamSubscription<TerminalSnapshot>? _snapshotSub;
-  StreamSubscription<ClaudePrompt>? _promptSub;
   StreamSubscription<RuntimeStatusEvent>? _runtimeSub;
   late final Terminal _terminal;
-  _PendingPrompt? _pendingPrompt;
   bool _isTyping = false;
   bool _runtimeEnsuring = false;
-  bool _leaving = false;
 
   @override
   void initState() {
@@ -60,7 +45,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     };
     _listenForErrors();
     _listenForSnapshot();
-    _listenForPrompts();
     _listenForRuntime();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_connectOnEnter());
@@ -72,7 +56,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _errorSub?.cancel();
     _outputSub?.cancel();
     _snapshotSub?.cancel();
-    _promptSub?.cancel();
     _runtimeSub?.cancel();
     super.dispose();
   }
@@ -104,19 +87,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _outputSub = socketService.terminalOutput.listen((output) {
       if (!mounted) return;
       _terminal.write(output.data);
-    });
-  }
-
-  void _listenForPrompts() {
-    final socketService = ref.read(socketServiceProvider);
-    _promptSub = socketService.claudePrompts.listen((prompt) {
-      if (!mounted) return;
-      setState(() {
-        _pendingPrompt = _PendingPrompt(
-          type: prompt.promptType,
-          rawText: prompt.rawText,
-        );
-      });
     });
   }
 
@@ -166,15 +136,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     return name;
   }
 
-  void _sendPromptDecision({required bool approved}) {
-    final socketService = ref.read(socketServiceProvider);
-    socketService.sendInput(approved ? 'y\r' : 'n\r');
-    if (!mounted) return;
-    setState(() {
-      _pendingPrompt = null;
-    });
-  }
-
   void _showSessionError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -212,26 +173,19 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           );
     }
 
-    if (!mounted || _leaving) return;
+    if (!mounted) return;
     final latestSession = ref.read(sessionProvider);
     if (latestSession?.agentConnected == true) {
       _ensureRuntime();
     }
   }
 
-  Future<void> _leaveTerminal() async {
-    if (_leaving) return;
-    _leaving = true;
-    try {
-      await ref.read(connectionNotifierProvider.notifier).disconnect();
-      if (!mounted) return;
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go(AppRoutes.home);
-      }
-    } finally {
-      _leaving = false;
+  void _goBackToList() {
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.home);
     }
   }
 
@@ -323,77 +277,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
             searchHitForeground: Color(0xFF1A1A1A),
           ),
         ),
-        if (_pendingPrompt != null)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A2E),
-                border: const Border(
-                  top: BorderSide(color: Color(0xFF3A3A5C), width: 1),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      _getPromptTitle(_pendingPrompt!.type),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFFE0E0E0),
-                      ),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _sendPromptDecision(approved: false),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            side: const BorderSide(color: Color(0xFF5C6370)),
-                            foregroundColor: const Color(0xFFABB2BF),
-                          ),
-                          child: const Text('拒绝'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _sendPromptDecision(approved: true),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            backgroundColor: const Color(0xFF98C379),
-                            foregroundColor: Colors.black,
-                          ),
-                          child: const Text('同意'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
       ],
     );
-  }
-
-  String _getPromptTitle(ClaudePromptType type) {
-    return type.displayName;
   }
 
   @override
@@ -406,9 +291,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     ref.listen<SessionModel?>(sessionProvider, (prev, next) {
       final becameConnected =
           next?.agentConnected == true && prev?.agentConnected != true;
-      if (!becameConnected || _leaving) return;
+      if (!becameConnected) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _leaving) return;
+        if (!mounted) return;
         _ensureRuntime();
       });
     });
@@ -417,10 +302,11 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         connectionStatus == ConnectionStatus.error;
 
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        unawaited(_leaveTerminal());
+        if (!didPop && mounted) {
+          context.go(AppRoutes.home);
+        }
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF1A1A2E),
@@ -516,7 +402,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       titleSpacing: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios, size: 18),
-        onPressed: () => unawaited(_leaveTerminal()),
+        onPressed: _goBackToList,
         tooltip: '返回',
       ),
       title: Column(

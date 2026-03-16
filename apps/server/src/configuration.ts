@@ -1,5 +1,5 @@
-import { Configuration, App } from '@midwayjs/decorator';
-import { ILifeCycle } from '@midwayjs/core';
+import { Configuration } from '@midwayjs/decorator';
+import { ILifeCycle, IMidwayContainer, MidwayFrameworkService } from '@midwayjs/core';
 import * as koa from '@midwayjs/koa';
 import * as socketio from '@midwayjs/socketio';
 import * as orm from '@midwayjs/typeorm';
@@ -12,12 +12,14 @@ import { TypeORMDataSourceManager } from '@midwayjs/typeorm';
   importConfigs: [join(__dirname, 'config')],
 })
 export class ContainerLifeCycle implements ILifeCycle {
-  @App()
-  app!: koa.Application;
+  async onReady(container: IMidwayContainer) {
+    // Get the Koa app via MidwayFrameworkService to avoid @App() property
+    // injection timing issues on Linux/Docker (framework init order differs from macOS).
+    const frameworkService = await container.getAsync(MidwayFrameworkService);
+    const app = frameworkService.getMainApp() as koa.Application;
 
-  async onReady() {
     // CORS middleware for REST endpoints
-    this.app.use(async (ctx, next) => {
+    app.use(async (ctx, next) => {
       ctx.set('Access-Control-Allow-Origin', '*');
       ctx.set('Access-Control-Allow-Methods', 'GET,HEAD,PUT,POST,DELETE,PATCH,OPTIONS');
       ctx.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
@@ -32,8 +34,8 @@ export class ContainerLifeCycle implements ILifeCycle {
     // After restart every WebSocket is gone; non-null IDs would cause mobile
     // to see a phantom "online" state for disconnected desktops.
     try {
-      const dsm = await this.app.getApplicationContext().getAsync(TypeORMDataSourceManager);
-      const ds  = dsm.getDataSource('default');
+      const dsm = await container.getAsync(TypeORMDataSourceManager);
+      const ds = dsm.getDataSource('default');
       await ds.query(
         `UPDATE sessions SET agent_socket_id = NULL, mobile_socket_id = NULL
          WHERE agent_socket_id IS NOT NULL OR mobile_socket_id IS NOT NULL`,

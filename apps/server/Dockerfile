@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22.18.0-alpine
 
 WORKDIR /workspace
 
@@ -13,6 +13,6 @@ RUN yarn build:shared && yarn build:server
 
 WORKDIR /workspace/apps/server
 
-EXPOSE 3000
+EXPOSE 7001
 
 CMD ["node", "dist/bootstrap.js"]

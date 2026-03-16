@@ -1,15 +1,15 @@
 "use strict";
+const electron = require("electron");
 const dotenv = require("dotenv");
 const path = require("path");
-const electron = require("electron");
-const events = require("events");
 const child_process = require("child_process");
+const fs = require("fs");
 const os = require("os");
+const events = require("events");
 const pty = require("node-pty");
 const socket_ioClient = require("socket.io-client");
 const axios = require("axios");
 const shared = require("@spark_coder/shared");
-const fs = require("fs");
 const crypto = require("crypto");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
@@ -870,6 +870,16 @@ const COMMON_PATHS_WIN32 = [
   path.join(os.homedir(), "AppData", "Roaming", "npm", "claude.cmd"),
   path.join(os.homedir(), "AppData", "Roaming", "npm", "claude")
 ];
+function nvmClaudePaths() {
+  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), ".nvm");
+  const versionsDir = path.join(nvmDir, "versions", "node");
+  if (!fs.existsSync(versionsDir)) return [];
+  try {
+    return fs.readdirSync(versionsDir).sort().reverse().map((v) => path.join(versionsDir, v, "bin", "claude")).filter(fs.existsSync);
+  } catch {
+    return [];
+  }
+}
 function detectClaudePath() {
   try {
     const cmd = process.platform === "win32" ? "where" : "which";
@@ -877,6 +887,10 @@ function detectClaudePath() {
     const first = result.split(/\r?\n/)[0]?.trim();
     if (first && fs.existsSync(first)) return first;
   } catch {
+  }
+  if (process.platform !== "win32") {
+    const nvmPaths = nvmClaudePaths();
+    if (nvmPaths.length > 0) return nvmPaths[0];
   }
   const candidates = process.platform === "win32" ? COMMON_PATHS_WIN32 : COMMON_PATHS_DARWIN;
   for (const p of candidates) {
@@ -1064,8 +1078,52 @@ async function maybeAutoStart(getWindow) {
     deviceId
   });
 }
+if (process.platform === "darwin" || process.platform === "linux") {
+  try {
+    const home = os.homedir();
+    let pathFromShell = "";
+    try {
+      const shell = process.env.SHELL || "/bin/zsh";
+      const output = child_process.execFileSync(shell, ["-i", "-c", "echo $PATH"], {
+        encoding: "utf8",
+        timeout: 5e3,
+        env: {
+          HOME: home,
+          USER: process.env.USER || os.userInfo().username,
+          LOGNAME: process.env.LOGNAME || os.userInfo().username,
+          TERM: "dumb"
+        }
+      });
+      const line = output.split("\n").filter((l) => l.includes("/")).at(-1)?.trim();
+      if (line) pathFromShell = line;
+    } catch {
+    }
+    const nvmDir = process.env.NVM_DIR || path.join(home, ".nvm");
+    const versionsDir = path.join(nvmDir, "versions", "node");
+    const nvmBinPaths = [];
+    if (fs.existsSync(versionsDir)) {
+      try {
+        const vers = fs.readdirSync(versionsDir).sort().reverse();
+        for (const v of vers) {
+          const binDir = path.join(versionsDir, v, "bin");
+          if (fs.existsSync(binDir)) nvmBinPaths.push(binDir);
+        }
+      } catch {
+      }
+    }
+    const basePath = pathFromShell || process.env.PATH || "";
+    const prefix = nvmBinPaths.length ? nvmBinPaths.join(":") + ":" : "";
+    if (prefix || pathFromShell) {
+      process.env.PATH = prefix + basePath;
+    }
+  } catch {
+  }
+}
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 dotenv.config({ path: path.resolve(process.cwd(), "apps/desktop/.env") });
+if (electron.app.isPackaged) {
+  dotenv.config({ path: path.join(electron.app.getAppPath(), ".prod.env") });
+}
 const gotLock = electron.app.requestSingleInstanceLock();
 if (!gotLock) {
   electron.app.quit();

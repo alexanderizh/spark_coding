@@ -73,3 +73,33 @@
   },
   fatal: true
 }
+2026-03-15 20:44:34.044 ERROR 71366 [-/::ffff:192.168.1.10/-/254ms POST /api/device/status] MidwayCommonError: DataSource undefined not found with current model class Device {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at DeviceService.get [as deviceRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at DeviceService.upsertDevice (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/device.service.ts:31:19)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at DeviceService.upsertDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/device.service.ts:74:5)
+    at SessionController.reportDesktopStatus (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/controller/session.controller.ts:154:5)
+    at SessionController.Clz.<computed> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/aspectService.js:92:34)
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/common/webGenerator.js:43:26
+    at /Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/configuration.ts:28:7
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/i18n/dist/middleware.js:150:17 {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}
+2026-03-15 20:44:34.085 ERROR 71366 [-/::ffff:192.168.1.10/-/3ms POST /api/session] MidwayCommonError: DataSource undefined not found with current model class Session {
+}, please check it.
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/typeorm/dist/configuration.js:24:23
+    at SessionService.get [as sessionRepo] (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/decoratorService.js:185:49)
+    at SessionService.createSession (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/service/session.service.ts:28:26)
+    at SessionController.createSession (/Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/controller/session.controller.ts:33:62)
+    at SessionController.Clz.<computed> (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/service/aspectService.js:92:53)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/core/dist/common/webGenerator.js:43:26
+    at /Users/zhangyang/spark_ai_project/spark_coding/apps/server/src/configuration.ts:28:7
+    at /Users/zhangyang/spark_ai_project/spark_coding/node_modules/@midwayjs/i18n/dist/middleware.js:150:17
+    at bodyParser (/Users/zhangyang/spark_ai_project/spark_coding/node_modules/koa-bodyparser/index.js:78:5) {
+  code: 'MIDWAY_10001',
+  cause: undefined
+}

@@ -2,10 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "strictPropertyInitialization": false,
-    "paths": {
-      "@spark_coder/shared": ["../../packages/shared/src"]
-    }
+    "rootDir": "src",
+    "strictPropertyInitialization": false
   },
   "include": ["src"]
 }

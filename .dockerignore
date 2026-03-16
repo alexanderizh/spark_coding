@@ -1,0 +1,22 @@
+# 排除各模块的本地编译产物，Docker 内会重新编译
+apps/server/dist/
+packages/*/dist/
+apps/terminal/dist/
+
+# 不需要打包进 Docker 的目录
+node_modules/
+apps/desktop/
+apps/mobile/
+apps/admin/
+docker-build/
+outputs/
+
+# 日志和本地数据
+apps/server/logs/
+apps/server/data/
+*.log
+
+# 环境文件（通过 docker run -e 或 docker-compose 注入）
+.env
+apps/server/.env
+apps/server/.prod.env

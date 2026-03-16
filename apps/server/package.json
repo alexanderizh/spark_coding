@@ -1,6 +1,6 @@
 {
   "name": "@spark_coder/server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MidwayJS relay server for spark_coder",
   "scripts": {
     "dev": "cross-env NODE_ENV=local ts-node-dev --project tsconfig.json src/bootstrap.ts",

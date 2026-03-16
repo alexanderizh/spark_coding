@@ -2,6 +2,9 @@ appId: com.sparkcoder.desktop
 productName: Spark Coder
 copyright: Copyright © 2024 Spark Coder
 
+# 显式指定 electron 版本，解决 yarn workspace 下 electron-builder 无法检测版本的问题
+electronVersion: "33.4.11"
+
 directories:
   buildResources: resources
   output: release
@@ -10,6 +13,7 @@ files:
   - out/**/*
   - node_modules/**/*
   - package.json
+  - .prod.env
 
 # Rebuild native modules (node-pty) for Electron
 npmRebuild: true
@@ -17,9 +21,7 @@ npmRebuild: true
 mac:
   target:
     - target: dmg
-      arch: [x64, arm64]
-    - target: zip
-      arch: [x64, arm64]
+      arch: [arm64]
   icon: resources/icon.png
   category: public.app-category.developer-tools
   hardenedRuntime: false
@@ -28,8 +30,6 @@ mac:
 win:
   target:
     - target: nsis
-      arch: [x64]
-    - target: portable
       arch: [x64]
   icon: resources/icon.png
 

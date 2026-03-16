@@ -62,6 +62,35 @@ CLI 参数 `--server-url` 可临时覆盖。
 - Claude 启动状态需在本地输出，至少覆盖 `starting / started / already_running / failed`。
 - Claude 输入需输出可观测日志（字节数 + 转义预览），避免仅保留黑盒转发。
 
+## 打包后 Claude 进程立即退出（exit code 1）— PATH 问题
+
+### 现象
+打包后的 Electron desktop app 启动时日志出现：
+```
+Attempting to spawn Claude at: %s claude   ← 路径未解析
+Claude process spawned successfully
+Claude process exited with code: 1         ← 立即退出
+```
+
+### 根本原因
+macOS 从 Dock/Finder 启动 `.app` 时，Electron 的 `process.env.PATH` **不继承用户 shell 的完整 PATH**（nvm、Homebrew 等路径均缺失）。
+
+导致问题：
+1. `resolveExecutable('claude')` 调用 `which claude` 失败（nvm 路径不在 PATH），回退为原始字符串 `'claude'`
+2. claude CLI 是 npm 生成的 shebang 脚本（`#!/usr/bin/env node`），系统找到脚本但 `env node` 失败（node 在 nvm 路径下，不在 PATH 里）
+3. 进程立即退出 code 1
+
+### 修复
+在 `apps/desktop/src/main/index.ts` 启动时：
+
+1. **用交互式 shell 取 PATH**：`$SHELL -i -c 'echo $PATH'`（`-i` 会加载 `.zshrc`/`.bashrc`，login shell `-lc` 在 zsh 下不加载 `.zshrc`，nvm 会取不到）。
+2. **显式把 nvm 的 node bin 目录 prepend 到 PATH**：枚举 `~/.nvm/versions/node/*/bin` 并拼到 PATH 前面，保证 `#!/usr/bin/env node` 一定能找到 `node`，避免 exit 127。
+
+若只做 (1) 而用 `-lc`，macOS zsh 下会拿到不含 nvm 的 PATH，仍会报 `env: node: No such file or directory`。
+
+### claude-detector.ts 补充 nvm 路径
+`detectClaudePath()` 须在 `which` 失败后枚举 `~/.nvm/versions/node/*/bin/claude` 作为候选路径（使用 `readdirSync` + `existsSync`）。
+
 ## 启动前环境预检
 
 - terminal 启动时先做环境预检，再创建会话。
