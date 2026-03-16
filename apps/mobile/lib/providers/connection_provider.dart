@@ -137,14 +137,15 @@ class ConnectionNotifier extends StateNotifier<AppConnectionState> {
   }) async {
     AppLogger.info('Connection', 'connect 调用 — sessionId: $sessionId');
 
-    // Deduplicate: if we are already connecting/connected to this exact session,
-    // skip. This prevents the scanner_screen + terminal_screen double-connect
-    // race where scanner calls connect() then immediately pushes terminal which
-    // calls connect() again with the same sessionId.
+    // Deduplicate: only skip when a connection to this sessionId is actively
+    // being established (connecting). This prevents the scanner_screen +
+    // terminal_screen double-connect race.
+    // Do NOT skip when already connected — the caller may have reset the
+    // SessionModel (via initSession), so we still need to rejoin to get a
+    // fresh session:state broadcast from the server (agentConnected, hostname).
     if (_connectingSessionId == sessionId &&
-        (state.status == ConnectionStatus.connecting ||
-         state.status == ConnectionStatus.connected)) {
-      AppLogger.info('Connection', '已在连接相同 sessionId，跳过重复请求');
+        state.status == ConnectionStatus.connecting) {
+      AppLogger.info('Connection', '正在建立相同 sessionId 的连接，跳过重复请求');
       return;
     }
 
