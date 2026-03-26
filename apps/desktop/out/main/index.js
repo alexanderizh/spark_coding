@@ -305,6 +305,8 @@ class TerminalBridge extends events.EventEmitter {
   outputSeq = 0;
   config;
   appStartTime = Date.now();
+  // Local terminals for multi-tab support
+  localTerminals = /* @__PURE__ */ new Map();
   // Batching
   batchBuffer = "";
   batchTimer;
@@ -379,6 +381,86 @@ class TerminalBridge extends events.EventEmitter {
   }
   getQrInfo() {
     return this.qrInfo;
+  }
+  /** Write input directly to PTY (for local terminal input) */
+  writeToTerminal(data) {
+    this.ptyProcess?.write(data);
+  }
+  // ── Local Terminal Management (Multi-Tab) ────────────────────────────────────
+  /** Create a new local terminal tab (no WebSocket session, just local PTY) */
+  createLocalTerminal(claudePath, cwd) {
+    const tabId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const execPath = this.resolveExecutable(claudePath);
+    try {
+      const ptyProcess = pty__namespace.spawn(execPath, [], {
+        name: "xterm-256color",
+        cols: 220,
+        rows: 50,
+        cwd,
+        env: {
+          ...process.env,
+          TERM: "xterm-256color",
+          COLORTERM: "truecolor",
+          LANG: "en_US.UTF-8"
+        }
+      });
+      const terminal = {
+        id: tabId,
+        ptyProcess,
+        outputBuffer: "",
+        cwd,
+        status: "running"
+      };
+      ptyProcess.onData((data) => {
+        terminal.outputBuffer += data;
+        if (terminal.outputBuffer.length > 100 * 1024) {
+          terminal.outputBuffer = terminal.outputBuffer.slice(-80 * 1024);
+        }
+        this.emit("local-output", { tabId, data });
+      });
+      ptyProcess.onExit(({ exitCode }) => {
+        terminal.status = "stopped";
+        this.emit("local-exit", { tabId, exitCode });
+      });
+      this.localTerminals.set(tabId, terminal);
+      return { ok: true, tabId, cwd };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log("ERROR: Failed to create local terminal: %s", msg);
+      return { ok: false, tabId: "", cwd };
+    }
+  }
+  /** Close a local terminal tab */
+  closeLocalTerminal(tabId) {
+    const terminal = this.localTerminals.get(tabId);
+    if (terminal) {
+      try {
+        terminal.ptyProcess.kill();
+      } catch {
+      }
+      this.localTerminals.delete(tabId);
+    }
+  }
+  /** Write input to a specific local terminal */
+  writeToLocalTerminal(tabId, data) {
+    const terminal = this.localTerminals.get(tabId);
+    if (terminal && terminal.status === "running") {
+      terminal.ptyProcess.write(data);
+    }
+  }
+  /** Resize a specific local terminal */
+  resizeLocalTerminal(tabId, cols, rows) {
+    const terminal = this.localTerminals.get(tabId);
+    if (terminal && terminal.status === "running") {
+      try {
+        terminal.ptyProcess.resize(cols, rows);
+      } catch {
+      }
+    }
+  }
+  /** Get output buffer for a local terminal */
+  getLocalTerminalOutput(tabId) {
+    return this.localTerminals.get(tabId)?.outputBuffer ?? "";
   }
   /** Called by IPC handler when renderer reports a new xterm viewport snapshot. */
   setXtermSnapshot(snapshot) {
@@ -1192,6 +1274,30 @@ function setupIpc(getWindow) {
   electron.ipcMain.on("xterm:snapshot", (_e, snapshot) => {
     bridge?.setXtermSnapshot(snapshot);
   });
+  electron.ipcMain.on("terminal:input", (_e, data) => {
+    bridge?.writeToTerminal(data);
+  });
+  electron.ipcMain.handle("local-terminal:create", () => {
+    if (!bridge) {
+      bridge = new TerminalBridge();
+      wireBridgeEvents(bridge, getWindow);
+    }
+    const settings = getSettings();
+    return bridge.createLocalTerminal(settings.claudePath, settings.cwd);
+  });
+  electron.ipcMain.handle("local-terminal:close", (_e, tabId) => {
+    bridge?.closeLocalTerminal(tabId);
+    return { ok: true };
+  });
+  electron.ipcMain.handle("local-terminal:getOutput", (_e, tabId) => {
+    return bridge?.getLocalTerminalOutput(tabId) ?? "";
+  });
+  electron.ipcMain.handle("local-terminal:resize", (_e, tabId, cols, rows) => {
+    bridge?.resizeLocalTerminal(tabId, cols, rows);
+  });
+  electron.ipcMain.on("local-terminal:input", (_e, tabId, data) => {
+    bridge?.writeToLocalTerminal(tabId, data);
+  });
   electron.ipcMain.handle("update:check", async () => {
     const serverUrl = getEffectiveServerUrl();
     if (!serverUrl) return { hasUpdate: false };
@@ -1308,6 +1414,8 @@ function wireBridgeEvents(b, getWindow) {
   b.on("prompt", (p) => send("session:prompt", p));
   b.on("claude-exit", (code) => send("session:claude-exit", code));
   b.on("desktop-status", (stat) => send("session:desktop-status", stat));
+  b.on("local-output", (e) => send("local-terminal:output", e));
+  b.on("local-exit", (e) => send("local-terminal:exit", e));
 }
 async function maybeAutoStart(getWindow) {
   const settings = getSettings();

@@ -79,6 +79,15 @@ export interface QrInfo {
   sessionId: string
 }
 
+// Local terminal instance for multi-tab support
+interface LocalTerminal {
+  id: string
+  ptyProcess: pty.IPty
+  outputBuffer: string
+  cwd: string
+  status: 'running' | 'stopped' | 'error'
+}
+
 // ── TerminalBridge ─────────────────────────────────────────────────────────────
 /**
  * Encapsulates all terminal / session logic.  Runs inside the Electron main
@@ -110,6 +119,9 @@ export class TerminalBridge extends EventEmitter {
   private outputSeq = 0
   private config?: BridgeConfig
   private appStartTime = Date.now()
+
+  // Local terminals for multi-tab support
+  private localTerminals: Map<string, LocalTerminal> = new Map()
 
   // Batching
   private batchBuffer = ''
@@ -193,6 +205,97 @@ export class TerminalBridge extends EventEmitter {
   getOutputBuffer(): string { return this.displayBuffer }
   getLogBuffer(): string { return this.logBuffer }
   getQrInfo(): QrInfo | undefined { return this.qrInfo }
+
+  /** Write input directly to PTY (for local terminal input) */
+  writeToTerminal(data: string): void {
+    this.ptyProcess?.write(data)
+  }
+
+  // ── Local Terminal Management (Multi-Tab) ────────────────────────────────────
+
+  /** Create a new local terminal tab (no WebSocket session, just local PTY) */
+  createLocalTerminal(claudePath: string, cwd: string): { ok: boolean; tabId: string; cwd: string } {
+    const tabId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const execPath = this.resolveExecutable(claudePath)
+
+    try {
+      const ptyProcess = pty.spawn(execPath, [], {
+        name: 'xterm-256color',
+        cols: 220,
+        rows: 50,
+        cwd,
+        env: {
+          ...process.env,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          LANG: 'en_US.UTF-8',
+        } as Record<string, string>,
+      })
+
+      const terminal: LocalTerminal = {
+        id: tabId,
+        ptyProcess,
+        outputBuffer: '',
+        cwd,
+        status: 'running',
+      }
+
+      ptyProcess.onData((data: string) => {
+        terminal.outputBuffer += data
+        // Keep buffer limited
+        if (terminal.outputBuffer.length > 100 * 1024) {
+          terminal.outputBuffer = terminal.outputBuffer.slice(-80 * 1024)
+        }
+        this.emit('local-output', { tabId, data })
+      })
+
+      ptyProcess.onExit(({ exitCode }) => {
+        terminal.status = 'stopped'
+        this.emit('local-exit', { tabId, exitCode })
+      })
+
+      this.localTerminals.set(tabId, terminal)
+      return { ok: true, tabId, cwd }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      this.log('ERROR: Failed to create local terminal: %s', msg)
+      return { ok: false, tabId: '', cwd }
+    }
+  }
+
+  /** Close a local terminal tab */
+  closeLocalTerminal(tabId: string): void {
+    const terminal = this.localTerminals.get(tabId)
+    if (terminal) {
+      try {
+        terminal.ptyProcess.kill()
+      } catch { /* ignore */ }
+      this.localTerminals.delete(tabId)
+    }
+  }
+
+  /** Write input to a specific local terminal */
+  writeToLocalTerminal(tabId: string, data: string): void {
+    const terminal = this.localTerminals.get(tabId)
+    if (terminal && terminal.status === 'running') {
+      terminal.ptyProcess.write(data)
+    }
+  }
+
+  /** Resize a specific local terminal */
+  resizeLocalTerminal(tabId: string, cols: number, rows: number): void {
+    const terminal = this.localTerminals.get(tabId)
+    if (terminal && terminal.status === 'running') {
+      try {
+        terminal.ptyProcess.resize(cols, rows)
+      } catch { /* ignore */ }
+    }
+  }
+
+  /** Get output buffer for a local terminal */
+  getLocalTerminalOutput(tabId: string): string {
+    return this.localTerminals.get(tabId)?.outputBuffer ?? ''
+  }
 
   /** Called by IPC handler when renderer reports a new xterm viewport snapshot. */
   setXtermSnapshot(snapshot: string): void {

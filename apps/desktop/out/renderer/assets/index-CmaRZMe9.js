@@ -17494,6 +17494,7 @@ function SessionPage() {
   const [qrInfo, setQrInfo] = reactExports.useState(null);
   const [pairedAt, setPairedAt] = reactExports.useState(null);
   const [logs, setLogs] = reactExports.useState("");
+  const [isFullscreen, setIsFullscreen] = reactExports.useState(false);
   const termRef = reactExports.useRef(null);
   const logsRef = reactExports.useRef(null);
   const xtermRef = reactExports.useRef(null);
@@ -17526,7 +17527,8 @@ function SessionPage() {
       fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
       fontSize: 13,
       lineHeight: 1.4,
-      cursorBlink: false,
+      cursorBlink: true,
+      cursorStyle: "block",
       scrollback: 5e3,
       convertEol: false
     });
@@ -17536,6 +17538,9 @@ function SessionPage() {
     fit.fit();
     xtermRef.current = term;
     fitRef.current = fit;
+    const dataDisposable = term.onData((data) => {
+      window.api.sendTerminalInput(data);
+    });
     window.api.getOutputBuffer().then((buf) => {
       if (buf) term.write(buf);
     });
@@ -17549,6 +17554,7 @@ function SessionPage() {
     ro2.observe(termRef.current);
     return () => {
       ro2.disconnect();
+      dataDisposable.dispose();
       term.dispose();
       xtermRef.current = null;
       fitRef.current = null;
@@ -17594,6 +17600,105 @@ function SessionPage() {
     };
   }, []);
   const uptime = pairedAt ? formatDuration(Date.now() - pairedAt) : "—";
+  const toggleFullscreen = () => {
+    setIsFullscreen((prev) => {
+      const newValue = !prev;
+      setTimeout(() => fitRef.current?.fit(), 50);
+      return newValue;
+    });
+  };
+  if (isFullscreen) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        style: {
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1e3,
+          display: "flex",
+          flexDirection: "column",
+          background: "#1a1a1a"
+        },
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 16px",
+                background: "#2a2a2a",
+                borderBottom: "1px solid #333"
+              },
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 12 }, children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "span",
+                    {
+                      className: `status-badge status--${status.status}`,
+                      style: { fontSize: 12 },
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "status-badge__dot" }),
+                        statusLabel(status.status)
+                      ]
+                    }
+                  ),
+                  qrInfo && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: "#888", fontSize: 12, fontFamily: "monospace" }, children: [
+                    qrInfo.sessionId.slice(0, 12),
+                    "…"
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8 }, children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      className: "btn btn--ghost",
+                      style: {
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        color: "#888",
+                        border: "1px solid #444"
+                      },
+                      onClick: () => xtermRef.current?.clear(),
+                      children: "清除"
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      className: "btn btn--ghost",
+                      style: {
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        color: "#888",
+                        border: "1px solid #444"
+                      },
+                      onClick: toggleFullscreen,
+                      children: "退出全屏"
+                    }
+                  )
+                ] })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "div",
+            {
+              ref: termRef,
+              style: {
+                flex: 1,
+                overflow: "hidden"
+              }
+            }
+          )
+        ]
+      }
+    );
+  }
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "session-page", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "page-title", children: "会话详情" }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card", style: { marginBottom: 16, flexShrink: 0 }, children: [
@@ -17620,15 +17725,27 @@ function SessionPage() {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "card session-output-card", style: { display: "flex", flexDirection: "column", marginBottom: 16 }, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }, children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontWeight: 600, fontSize: 13, color: "var(--text-secondary)" }, children: "Claude CLI 输出" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: "btn btn--ghost",
-            style: { padding: "4px 10px", fontSize: 12 },
-            onClick: () => xtermRef.current?.clear(),
-            children: "清除"
-          }
-        )
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: 8 }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              className: "btn btn--ghost",
+              style: { padding: "4px 10px", fontSize: 12 },
+              onClick: toggleFullscreen,
+              title: "全屏显示",
+              children: "⛶"
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              className: "btn btn--ghost",
+              style: { padding: "4px 10px", fontSize: 12 },
+              onClick: () => xtermRef.current?.clear(),
+              children: "清除"
+            }
+          )
+        ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "div",
@@ -18276,6 +18393,258 @@ function ConnectionsPage() {
     )) })
   ] });
 }
+function TabBar({
+  tabs,
+  activeTabId,
+  onCreateTab,
+  onCloseTab,
+  onSwitchTab
+}) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "tab-bar", children: [
+    tabs.map((tab) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        className: `tab-item ${tab.id === activeTabId ? "tab-item--active" : ""}`,
+        onClick: () => onSwitchTab(tab.id),
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `tab-item__status tab-item__status--${tab.status}` }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "tab-item__title", title: tab.title, children: tab.title }),
+          tabs.length > 1 && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              className: "tab-item__close",
+              onClick: (e) => {
+                e.stopPropagation();
+                onCloseTab(tab.id);
+              },
+              children: "×"
+            }
+          )
+        ]
+      },
+      tab.id
+    )),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "tab-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "button",
+      {
+        className: "tab-action-btn tab-action-btn--primary",
+        onClick: onCreateTab,
+        title: "新建终端",
+        children: "+"
+      }
+    ) })
+  ] });
+}
+function TerminalPanel({
+  tabId,
+  onInput,
+  onResize,
+  outputBuffer = ""
+}) {
+  const containerRef = reactExports.useRef(null);
+  const termRef = reactExports.useRef(null);
+  const fitRef = reactExports.useRef(null);
+  const lastBufferRef = reactExports.useRef("");
+  reactExports.useEffect(() => {
+    if (!containerRef.current) return;
+    const term = new Dl({
+      theme: {
+        background: "#1a1a1a",
+        foreground: "#e0e0e0",
+        cursor: "#e0e0e0",
+        selectionBackground: "rgba(255,255,255,0.2)",
+        black: "#1a1a1a",
+        brightBlack: "#555",
+        red: "#e06c75",
+        brightRed: "#e06c75",
+        green: "#98c379",
+        brightGreen: "#98c379",
+        yellow: "#e5c07b",
+        brightYellow: "#e5c07b",
+        blue: "#61afef",
+        brightBlue: "#61afef",
+        magenta: "#c678dd",
+        brightMagenta: "#c678dd",
+        cyan: "#56b6c2",
+        brightCyan: "#56b6c2",
+        white: "#abb2bf",
+        brightWhite: "#e0e0e0"
+      },
+      fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+      fontSize: 13,
+      lineHeight: 1.4,
+      cursorBlink: true,
+      cursorStyle: "block",
+      scrollback: 5e3,
+      convertEol: false
+    });
+    const fit = new o();
+    term.loadAddon(fit);
+    term.open(containerRef.current);
+    fit.fit();
+    term.onData((data) => {
+      onInput(tabId, data);
+    });
+    termRef.current = term;
+    fitRef.current = fit;
+    lastBufferRef.current = "";
+    const ro2 = new ResizeObserver(() => {
+      fitRef.current?.fit();
+      if (termRef.current && onResize) {
+        onResize(tabId, termRef.current.cols, termRef.current.rows);
+      }
+    });
+    ro2.observe(containerRef.current);
+    return () => {
+      ro2.disconnect();
+      term.dispose();
+      termRef.current = null;
+      fitRef.current = null;
+    };
+  }, [tabId, onInput, onResize]);
+  reactExports.useEffect(() => {
+    const term = termRef.current;
+    if (!term || !outputBuffer) return;
+    if (outputBuffer.length > lastBufferRef.current.length) {
+      const newContent = outputBuffer.slice(lastBufferRef.current.length);
+      term.write(newContent);
+      lastBufferRef.current = outputBuffer;
+    } else if (outputBuffer !== lastBufferRef.current) {
+      term.clear();
+      term.write(outputBuffer);
+      lastBufferRef.current = outputBuffer;
+    }
+  }, [outputBuffer]);
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    "div",
+    {
+      ref: containerRef,
+      style: {
+        flex: 1,
+        minHeight: 200,
+        borderRadius: 6,
+        overflow: "hidden",
+        background: "#1a1a1a"
+      }
+    }
+  );
+}
+function LocalTerminalPage() {
+  const [tabs, setTabs] = reactExports.useState([]);
+  const [activeTabId, setActiveTabId] = reactExports.useState(null);
+  const outputBuffers = reactExports.useRef(/* @__PURE__ */ new Map());
+  reactExports.useEffect(() => {
+    if (tabs.length === 0) {
+      createTab();
+    }
+  }, []);
+  reactExports.useEffect(() => {
+    const unOutput = window.api.onLocalTerminalOutput((e) => {
+      const current = outputBuffers.current.get(e.tabId) || "";
+      outputBuffers.current.set(e.tabId, current + e.data);
+      if (e.tabId === activeTabId) {
+        setTabs((prev) => [...prev]);
+      }
+    });
+    const unExit = window.api.onLocalTerminalExit((e) => {
+      setTabs(
+        (prev) => prev.map(
+          (tab) => tab.id === e.tabId ? { ...tab, status: "stopped" } : tab
+        )
+      );
+    });
+    return () => {
+      unOutput();
+      unExit();
+    };
+  }, [activeTabId]);
+  const createTab = reactExports.useCallback(async () => {
+    const result = await window.api.createLocalTerminal();
+    if (result.ok) {
+      const newTab = {
+        id: result.tabId,
+        title: "Claude",
+        status: "running",
+        cwd: result.cwd,
+        createdAt: Date.now()
+      };
+      outputBuffers.current.set(result.tabId, "");
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(result.tabId);
+    }
+  }, []);
+  const closeTab = reactExports.useCallback(
+    async (tabId) => {
+      await window.api.closeLocalTerminal(tabId);
+      outputBuffers.current.delete(tabId);
+      setTabs((prev) => {
+        const newTabs = prev.filter((t2) => t2.id !== tabId);
+        if (tabId === activeTabId && newTabs.length > 0) {
+          setActiveTabId(newTabs[newTabs.length - 1].id);
+        }
+        return newTabs;
+      });
+    },
+    [activeTabId]
+  );
+  const switchTab = reactExports.useCallback((tabId) => {
+    setActiveTabId(tabId);
+  }, []);
+  const handleInput = reactExports.useCallback((tabId, data) => {
+    window.api.sendLocalTerminalInput(tabId, data);
+  }, []);
+  const handleResize = reactExports.useCallback((tabId, cols, rows) => {
+    window.api.resizeLocalTerminal(tabId, cols, rows);
+  }, []);
+  const activeOutput = activeTabId ? outputBuffers.current.get(activeTabId) || "" : "";
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "session-page", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "page-title", children: "本地终端" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      TabBar,
+      {
+        tabs,
+        activeTabId,
+        onCreateTab: createTab,
+        onCloseTab: closeTab,
+        onSwitchTab: switchTab
+      }
+    ),
+    activeTabId ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "div",
+      {
+        className: "card session-output-card",
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0
+        },
+        children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+          TerminalPanel,
+          {
+            tabId: activeTabId,
+            outputBuffer: activeOutput,
+            onInput: handleInput,
+            onResize: handleResize
+          }
+        )
+      }
+    ) : /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "div",
+      {
+        className: "card",
+        style: {
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--text-muted)"
+        },
+        children: "点击 [+] 创建新终端"
+      }
+    )
+  ] });
+}
 const btnBase = {
   display: "inline-flex",
   alignItems: "center",
@@ -18453,6 +18822,7 @@ function ErrorView({
 const NAV = [
   { id: "pairing", icon: "📡", label: "配对" },
   { id: "session", icon: "💬", label: "会话" },
+  { id: "terminal", icon: "🖥️", label: "终端" },
   { id: "connections", icon: "🔗", label: "连接" },
   { id: "settings", icon: "⚙️", label: "设置" }
 ];
@@ -18480,6 +18850,7 @@ function App() {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "content", children: [
       page === "pairing" && /* @__PURE__ */ jsxRuntimeExports.jsx(PairingPage, {}),
       page === "session" && /* @__PURE__ */ jsxRuntimeExports.jsx(SessionPage, {}),
+      page === "terminal" && /* @__PURE__ */ jsxRuntimeExports.jsx(LocalTerminalPage, {}),
       page === "connections" && /* @__PURE__ */ jsxRuntimeExports.jsx(ConnectionsPage, {}),
       page === "settings" && /* @__PURE__ */ jsxRuntimeExports.jsx(SettingsPage, {})
     ] }),

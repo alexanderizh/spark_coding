@@ -9,6 +9,7 @@ export function SessionPage(): React.ReactElement {
   const [qrInfo, setQrInfo] = useState<QrInfo | null>(null)
   const [pairedAt, setPairedAt] = useState<number | null>(null)
   const [logs, setLogs] = useState<string>('')
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const termRef = useRef<HTMLDivElement>(null)
   const logsRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
@@ -44,7 +45,8 @@ export function SessionPage(): React.ReactElement {
       fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
       fontSize:   13,
       lineHeight: 1.4,
-      cursorBlink: false,
+      cursorBlink: true,
+      cursorStyle: 'block',
       scrollback: 5000,
       convertEol: false,
     })
@@ -56,6 +58,11 @@ export function SessionPage(): React.ReactElement {
 
     xtermRef.current = term
     fitRef.current   = fit
+
+    // Listen for user input and send to PTY
+    const dataDisposable = term.onData((data: string) => {
+      window.api.sendTerminalInput(data)
+    })
 
     // Fetch buffered output on mount
     window.api.getOutputBuffer().then((buf) => {
@@ -75,6 +82,7 @@ export function SessionPage(): React.ReactElement {
 
     return () => {
       ro.disconnect()
+      dataDisposable.dispose()
       term.dispose()
       xtermRef.current = null
       fitRef.current   = null
@@ -129,6 +137,97 @@ export function SessionPage(): React.ReactElement {
 
   const uptime = pairedAt ? formatDuration(Date.now() - pairedAt) : '—'
 
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    setIsFullscreen((prev) => {
+      const newValue = !prev
+      // Delay fit to allow CSS transition
+      setTimeout(() => fitRef.current?.fit(), 50)
+      return newValue
+    })
+  }
+
+  // Fullscreen terminal overlay
+  if (isFullscreen) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#1a1a1a',
+        }}
+      >
+        {/* Fullscreen header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 16px',
+            background: '#2a2a2a',
+            borderBottom: '1px solid #333',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span
+              className={`status-badge status--${status.status}`}
+              style={{ fontSize: 12 }}
+            >
+              <span className="status-badge__dot" />
+              {statusLabel(status.status)}
+            </span>
+            {qrInfo && (
+              <span style={{ color: '#888', fontSize: 12, fontFamily: 'monospace' }}>
+                {qrInfo.sessionId.slice(0, 12)}…
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn--ghost"
+              style={{
+                padding: '4px 10px',
+                fontSize: 12,
+                color: '#888',
+                border: '1px solid #444',
+              }}
+              onClick={() => xtermRef.current?.clear()}
+            >
+              清除
+            </button>
+            <button
+              className="btn btn--ghost"
+              style={{
+                padding: '4px 10px',
+                fontSize: 12,
+                color: '#888',
+                border: '1px solid #444',
+              }}
+              onClick={toggleFullscreen}
+            >
+              退出全屏
+            </button>
+          </div>
+        </div>
+
+        {/* Terminal */}
+        <div
+          ref={termRef}
+          style={{
+            flex: 1,
+            overflow: 'hidden',
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="session-page">
       <h2 className="page-title">会话详情</h2>
@@ -168,13 +267,23 @@ export function SessionPage(): React.ReactElement {
           <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-secondary)' }}>
             Claude CLI 输出
           </span>
-          <button
-            className="btn btn--ghost"
-            style={{ padding: '4px 10px', fontSize: 12 }}
-            onClick={() => xtermRef.current?.clear()}
-          >
-            清除
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn--ghost"
+              style={{ padding: '4px 10px', fontSize: 12 }}
+              onClick={toggleFullscreen}
+              title="全屏显示"
+            >
+              ⛶
+            </button>
+            <button
+              className="btn btn--ghost"
+              style={{ padding: '4px 10px', fontSize: 12 }}
+              onClick={() => xtermRef.current?.clear()}
+            >
+              清除
+            </button>
+          </div>
         </div>
 
         <div

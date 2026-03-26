@@ -60,6 +60,15 @@ export interface PairedSessionRecord {
   lastUsedAt:      number
 }
 
+// ── Local Terminal Tab ─────────────────────────────────────────────────────
+export interface TerminalTab {
+  id: string
+  title: string
+  status: 'running' | 'stopped' | 'error'
+  cwd: string
+  createdAt: number
+}
+
 declare global {
   interface Window {
     api: {
@@ -84,10 +93,23 @@ declare global {
       stopSession:     () => Promise<{ ok: boolean }>
       getSessionStatus: () => Promise<{ status: BridgeStatus; qrInfo?: QrInfo }>
       getOutputBuffer:  () => Promise<string>
+      getLogBuffer:     () => Promise<string>
       restartClaude:   () => Promise<{ ok: boolean; error?: string }>
       relaunchApp:     () => Promise<void>
       quitApp:         () => Promise<void>
       reportXtermSnapshot: (snapshot: string) => void
+
+      // Terminal Input
+      sendTerminalInput: (data: string) => void
+
+      // Local Terminal Tabs
+      createLocalTerminal: () => Promise<{ ok: boolean; tabId: string; cwd: string }>
+      closeLocalTerminal: (tabId: string) => Promise<{ ok: boolean }>
+      getLocalTerminalOutput: (tabId: string) => Promise<string>
+      resizeLocalTerminal: (tabId: string, cols: number, rows: number) => Promise<void>
+      sendLocalTerminalInput: (tabId: string, data: string) => void
+      onLocalTerminalOutput: (cb: (e: { tabId: string; data: string }) => void) => () => void
+      onLocalTerminalExit: (cb: (e: { tabId: string; exitCode: number }) => void) => () => void
 
       // Events (return unsubscribe fn)
       onStatus:        (cb: (v: StatusInfo) => void)          => () => void

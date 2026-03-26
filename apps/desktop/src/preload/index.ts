@@ -100,6 +100,40 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.send('xterm:snapshot', snapshot)
   },
 
+  // ── Terminal Input ───────────────────────────────────────────────────────
+  sendTerminalInput: (data: string): void => {
+    ipcRenderer.send('terminal:input', data)
+  },
+
+  // ── Local Terminal Tabs ───────────────────────────────────────────────────────
+  createLocalTerminal: (): Promise<{ ok: boolean; tabId: string; cwd: string }> =>
+    ipcRenderer.invoke('local-terminal:create'),
+
+  closeLocalTerminal: (tabId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('local-terminal:close', tabId),
+
+  getLocalTerminalOutput: (tabId: string): Promise<string> =>
+    ipcRenderer.invoke('local-terminal:getOutput', tabId),
+
+  resizeLocalTerminal: (tabId: string, cols: number, rows: number): Promise<void> =>
+    ipcRenderer.invoke('local-terminal:resize', tabId, cols, rows),
+
+  sendLocalTerminalInput: (tabId: string, data: string): void => {
+    ipcRenderer.send('local-terminal:input', tabId, data)
+  },
+
+  onLocalTerminalOutput: (cb: (e: { tabId: string; data: string }) => void): Unsubscribe => {
+    const handler = (_: IpcRendererEvent, e: { tabId: string; data: string }) => cb(e)
+    ipcRenderer.on('local-terminal:output', handler)
+    return () => ipcRenderer.off('local-terminal:output', handler)
+  },
+
+  onLocalTerminalExit: (cb: (e: { tabId: string; exitCode: number }) => void): Unsubscribe => {
+    const handler = (_: IpcRendererEvent, e: { tabId: string; exitCode: number }) => cb(e)
+    ipcRenderer.on('local-terminal:exit', handler)
+    return () => ipcRenderer.off('local-terminal:exit', handler)
+  },
+
   // ── Auto-update ───────────────────────────────────────────────────────────
   checkForUpdate: (): Promise<unknown> =>
     ipcRenderer.invoke('update:check'),

@@ -52,6 +52,28 @@ electron.contextBridge.exposeInMainWorld("api", {
   reportXtermSnapshot: (snapshot) => {
     electron.ipcRenderer.send("xterm:snapshot", snapshot);
   },
+  // ── Terminal Input ───────────────────────────────────────────────────────
+  sendTerminalInput: (data) => {
+    electron.ipcRenderer.send("terminal:input", data);
+  },
+  // ── Local Terminal Tabs ───────────────────────────────────────────────────────
+  createLocalTerminal: () => electron.ipcRenderer.invoke("local-terminal:create"),
+  closeLocalTerminal: (tabId) => electron.ipcRenderer.invoke("local-terminal:close", tabId),
+  getLocalTerminalOutput: (tabId) => electron.ipcRenderer.invoke("local-terminal:getOutput", tabId),
+  resizeLocalTerminal: (tabId, cols, rows) => electron.ipcRenderer.invoke("local-terminal:resize", tabId, cols, rows),
+  sendLocalTerminalInput: (tabId, data) => {
+    electron.ipcRenderer.send("local-terminal:input", tabId, data);
+  },
+  onLocalTerminalOutput: (cb) => {
+    const handler = (_, e) => cb(e);
+    electron.ipcRenderer.on("local-terminal:output", handler);
+    return () => electron.ipcRenderer.off("local-terminal:output", handler);
+  },
+  onLocalTerminalExit: (cb) => {
+    const handler = (_, e) => cb(e);
+    electron.ipcRenderer.on("local-terminal:exit", handler);
+    return () => electron.ipcRenderer.off("local-terminal:exit", handler);
+  },
   // ── Auto-update ───────────────────────────────────────────────────────────
   checkForUpdate: () => electron.ipcRenderer.invoke("update:check"),
   downloadUpdate: (url) => electron.ipcRenderer.invoke("update:download", url),

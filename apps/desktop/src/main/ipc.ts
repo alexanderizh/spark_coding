@@ -157,6 +157,39 @@ export function setupIpc(getWindow: () => BrowserWindow | null): void {
     bridge?.setXtermSnapshot(snapshot)
   })
 
+  // ── Terminal Input ───────────────────────────────────────────────────────
+  ipcMain.on('terminal:input', (_e: IpcMainEvent, data: string) => {
+    bridge?.writeToTerminal(data)
+  })
+
+  // ── Local Terminal Tabs ───────────────────────────────────────────────────────
+  ipcMain.handle('local-terminal:create', () => {
+    if (!bridge) {
+      // Create a minimal bridge just for local terminals if needed
+      bridge = new TerminalBridge()
+      wireBridgeEvents(bridge, getWindow)
+    }
+    const settings = getSettings()
+    return bridge.createLocalTerminal(settings.claudePath, settings.cwd)
+  })
+
+  ipcMain.handle('local-terminal:close', (_e, tabId: string) => {
+    bridge?.closeLocalTerminal(tabId)
+    return { ok: true }
+  })
+
+  ipcMain.handle('local-terminal:getOutput', (_e, tabId: string) => {
+    return bridge?.getLocalTerminalOutput(tabId) ?? ''
+  })
+
+  ipcMain.handle('local-terminal:resize', (_e, tabId: string, cols: number, rows: number) => {
+    bridge?.resizeLocalTerminal(tabId, cols, rows)
+  })
+
+  ipcMain.on('local-terminal:input', (_e: IpcMainEvent, tabId: string, data: string) => {
+    bridge?.writeToLocalTerminal(tabId, data)
+  })
+
   // ── Auto-update ───────────────────────────────────────────────────────────
   ipcMain.handle('update:check', async () => {
     const serverUrl = getEffectiveServerUrl()
@@ -307,6 +340,10 @@ function wireBridgeEvents(b: TerminalBridge, getWindow: () => BrowserWindow | nu
   b.on('prompt',         (p)     => send('session:prompt',        p))
   b.on('claude-exit',    (code)  => send('session:claude-exit',   code))
   b.on('desktop-status', (stat)  => send('session:desktop-status', stat))
+
+  // Local terminal events
+  b.on('local-output',   (e: { tabId: string; data: string }) => send('local-terminal:output', e))
+  b.on('local-exit',     (e: { tabId: string; exitCode: number }) => send('local-terminal:exit', e))
 }
 
 /**
